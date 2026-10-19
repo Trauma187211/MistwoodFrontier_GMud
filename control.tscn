@@ -1,0 +1,40 @@
+[gd_scene format=3 uid="uid://chhxyvbm28y23"]
+
+[ext_resource type="Script" uid="uid://5i25fxi43j1v" path="res://control.gd" id="1_0fbet"]
+
+[node name="Control" type="Control" unique_id=869097761]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_0fbet")
+
+[node name="Terminal" type="RichTextLabel" parent="." unique_id=1636668292]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = -50.0
+grow_horizontal = 2
+grow_vertical = 2
+bbcode_enabled = true
+scroll_following = true
+selection_enabled = true
+
+[node name="Input" type="LineEdit" parent="." unique_id=1163405386]
+layout_mode = 1
+anchors_preset = -1
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 10.0
+offset_top = -40.0
+offset_right = -10.0
+offset_bottom = -10.0
+placeholder_text = "Type a command (help for list)..."
+caret_blink = true
