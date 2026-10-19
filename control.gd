@@ -817,23 +817,21 @@ func level_up():
 # SPELLS
 # ============================
 func get_spell_cost(spell):
-	var cost = 10
-	match spell:
-		"meteor":
-			cost = 25
-		"holy", "heal":
-			cost = 12
-		"fire":
-			if player_class == "warden":
-				cost = 8
-	cost = int(ceil(cost * (1.0 + talent_mod("mana_cost_pct"))))
-	return cost
+	var def = GameDatabase.SPELLS.get(spell)
+	if def == null:
+		return 0
+	var base = def["class_cost"].get(player_class, def["mana_cost"]) if def.has("class_cost") else def["mana_cost"]
+	var cost = base * def["balance_mult"] * (1.0 + talent_mod("mana_cost_pct"))
+	# Round to nearest, never free, so percentage tweaks stay meaningful on small costs.
+	return max(roundi(cost), 1)
 
 func cast_spell(spell):
-	if not spell in ["fire", "meteor", "holy", "heal"]:
+	spell = GameDatabase.SPELL_ALIASES.get(spell, spell)
+	if not GameDatabase.SPELLS.has(spell):
 		log_error("Unknown spell.")
 		return
-	if (spell == "holy" or spell == "heal") and player_class != "warden":
+	var class_only = GameDatabase.SPELLS[spell].get("class_only", "")
+	if class_only != "" and player_class != class_only:
 		log_error("Only clerics can cast that.")
 		return
 	if spell_cooldowns.has(spell):
@@ -980,12 +978,12 @@ func get_talent_entries():
 			n += 1
 	return entries
 
-func find_talent_entry(query):
+func find_talent_entry(query) -> Dictionary:
 	query = query.strip_edges().to_lower().replace(" ", "_")
 	for e in get_talent_entries():
 		if str(e["number"]) == query or e["id"] == query or e["id"].replace("_", "") == query.replace("_", ""):
 			return e
-	return null
+	return {}
 
 func refresh_talent_hp():
 	var base = player_max_hp - talent_hp_bonus
@@ -1044,8 +1042,8 @@ func choose_talent(query):
 	if enemy != null:
 		log_error("You can't change talents during combat.")
 		return
-	var e = find_talent_entry(query)
-	if e == null:
+	var e: Dictionary = find_talent_entry(query)
+	if e.is_empty():
 		log_error("Unknown talent. Type 'talents' to see the list.")
 		return
 	if player_level < e["level"]:

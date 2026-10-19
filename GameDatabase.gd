@@ -54,6 +54,19 @@ const RECIPES = {
 }
 
 # ============================
+# SPELLS
+# ============================
+# mana_cost is the pre-balance base; balance_mult is the tuning knob (Fire: -10%).
+# class_cost optionally overrides the base for a class.
+const SPELLS = {
+	"fire": {"label": "Fire", "mana_cost": 10, "balance_mult": 0.9, "class_cost": {"warden": 8}},
+	"meteor": {"label": "Meteor", "mana_cost": 25, "balance_mult": 1.0},
+	"holy": {"label": "Holy Light", "mana_cost": 12, "balance_mult": 1.0, "class_only": "warden"},
+	"heal": {"label": "Heal", "mana_cost": 12, "balance_mult": 1.0, "class_only": "warden"}
+}
+const SPELL_ALIASES = {"fireball": "fire"}
+
+# ============================
 # ROOMS
 # ============================
 # Exit keys: forward / left / right / back. "boss": true marks a one-time boss encounter.
