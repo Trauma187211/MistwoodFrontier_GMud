@@ -5,3 +5,21 @@
 # Exported builds
 *.exe
 *.pck
+*.zip
+
+# Local save files or test logs (just in case they write locally)
+savegame.json
+fuzz_report.txt
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Operating System junk files
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+Desktop.ini
