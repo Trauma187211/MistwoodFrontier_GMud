@@ -50,81 +50,6 @@ var professions = {
 	"enchanting": false
 }
 
-# ============================
-# TALENTS
-# ============================
-# Class ids: guardian = Warrior, mage = Mage, slayer = Rogue, warden = Cleric/Paladin.
-# Tiers are numbered in display order; option ids are unique per class.
-const TALENT_TREES = {
-	"guardian": {
-		"title": "WARRIOR",
-		"tiers": [
-			{"level": 5, "name": "Combat Stance", "options": [
-				{"id": "brawler", "name": "Brawler", "desc": "+15% Physical Damage with melee attacks"},
-				{"id": "juggernaut", "name": "Juggernaut", "desc": "+20% Max HP, +10 Armor"}
-			]},
-			{"level": 10, "name": "Battle Mastery", "options": [
-				{"id": "executioner", "name": "Executioner", "desc": "+30% damage to targets under 30% HP"},
-				{"id": "ironclad", "name": "Ironclad", "desc": "Emergency Shield (25% Max HP, 3 turns) under 35% HP, once per combat"}
-			]},
-			{"level": 15, "name": "Heroic Capstone", "options": [
-				{"id": "whirlwind_fury", "name": "Whirlwind Fury", "desc": "Unlocks 'whirlwind' command: 80% weapon damage to all enemies"},
-				{"id": "unyielding_sentinel", "name": "Unyielding Sentinel", "desc": "Reflect 20% of incoming physical damage"}
-			]}
-		]
-	},
-	"mage": {
-		"title": "MAGE",
-		"tiers": [
-			{"level": 5, "name": "Arcane Mastery", "options": [
-				{"id": "pyromancy", "name": "Pyromancy", "desc": "Fire spells burn for 10% of damage per turn for 3 turns"},
-				{"id": "subtle_magic", "name": "Subtle Magic", "desc": "-20% mana cost on all spells"}
-			]},
-			{"level": 10, "name": "Metamagic", "options": [
-				{"id": "spellweave", "name": "Spellweave", "desc": "Each cast gives +5% spell crit chance, stacks up to 4"},
-				{"id": "arcane_barrier", "name": "Arcane Barrier", "desc": "15% of damage taken is absorbed by Mana"}
-			]},
-			{"level": 15, "name": "High Sorcery", "options": [
-				{"id": "chain_impact", "name": "Chain Impact", "desc": "Single-target spells have 30% chance to jump to a second target for 70% damage"},
-				{"id": "time_warp", "name": "Time Warp", "desc": "Unlocks 'timewarp' command: reset all spell cooldowns (10 turn cooldown)"}
-			]}
-		]
-	},
-	"slayer": {
-		"title": "ROGUE",
-		"tiers": [
-			{"level": 5, "name": "Precision", "options": [
-				{"id": "lethality", "name": "Lethality", "desc": "+10% Crit Chance, +25% Crit Damage"},
-				{"id": "fleet_footed", "name": "Fleet Footed", "desc": "+15% Evasion"}
-			]},
-			{"level": 10, "name": "Underhanded Tactics", "options": [
-				{"id": "venomous_blades", "name": "Venomous Blades", "desc": "Basic attacks poison enemies (Nature damage, reduced healing)"},
-				{"id": "shadow_step", "name": "Shadow Step", "desc": "Attacks from Stealth always crit and ignore 100% Armor"}
-			]},
-			{"level": 15, "name": "Master Assassin", "options": [
-				{"id": "flurry_of_steel", "name": "Flurry of Steel", "desc": "25% chance for an extra off-hand strike"},
-				{"id": "vanish", "name": "Vanish", "desc": "Unlocks 'vanish' command: escape combat and re-enter Stealth"}
-			]}
-		]
-	},
-	"warden": {
-		"title": "CLERIC",
-		"tiers": [
-			{"level": 5, "name": "Devotion", "options": [
-				{"id": "smite_the_unworthy", "name": "Smite the Unworthy", "desc": "Holy spells deal +20% damage to Undead/Demons"},
-				{"id": "blessed_light", "name": "Blessed Light", "desc": "+20% healing from spells and items"}
-			]},
-			{"level": 10, "name": "Aegis", "options": [
-				{"id": "divine_grace", "name": "Divine Grace", "desc": "Debuffs on you last 50% fewer turns"},
-				{"id": "retribution", "name": "Retribution", "desc": "Taking damage grants Zeal: +3% damage per stack, max 5"}
-			]},
-			{"level": 15, "name": "Avatar", "options": [
-				{"id": "lay_on_hands", "name": "Lay on Hands", "desc": "Unlocks 'layonhands' command: full heal, once per run"},
-				{"id": "aura_of_protection", "name": "Aura of Protection", "desc": "Party gains +15 Armor and +10% Elemental Resistance"}
-			]}
-		]
-	}
-}
 
 # tier number (as string) -> talent id
 var talent_choices = {}
@@ -185,193 +110,6 @@ var has_combat_pet = false
 var pet_name = ""
 var pet_damage_bonus = 0
 
-# ============================
-# CRAFTING RECIPES
-# ============================
-var recipes = {
-	"iron_sword": {
-		"profession": "blacksmithing",
-		"materials": {
-			"iron_ore": 3,
-			"wolf_pelt": 1
-		},
-		"result_item": "iron_sword",
-		"slot": "weapon",
-		"attack_bonus": 6
-	},
-	"leather_armor": {
-		"profession": "blacksmithing",
-		"materials": {
-			"wolf_pelt": 3
-		},
-		"result_item": "leather_armor",
-		"slot": "armor",
-		"defense_bonus": 4
-	},
-	"healing_draught": {
-		"profession": "alchemy",
-		"materials": {
-			"herb": 2,
-			"ether": 1
-		},
-		"result_item": "healing_draught"
-	},
-	"focus_charm": {
-		"profession": "enchanting",
-		"materials": {
-			"arcane_dust": 2,
-			"trinket_shard": 1
-		},
-		"result_item": "focus_charm",
-		"slot": "trinket",
-		"attack_bonus": 2,
-		"defense_bonus": 1
-	}
-}
-
-# ============================
-# WORLD / ROOMS
-# ============================
-var rooms = {
-	# Starting zones
-	"dawnwatch_outpost": {
-		"desc": "Dawnwatch Outpost: timber walls and watchtowers guard the Mistwood frontier.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 5,
-		"music": "camp_theme"
-	},
-	"emberfall_camp": {
-		"desc": "Emberfall Camp: braziers and banners, steel and prayer mingling in the air.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 5,
-		"music": "camp_theme"
-	},
-	"stonegate_hold": {
-		"desc": "Stonegate Hold: carved from cliffstone, runes hum beneath your boots.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 5,
-		"music": "camp_theme"
-	},
-	"bloodfang_warcamp": {
-		"desc": "Bloodfang Warcamp: crude spikes, roaring fires, and the smell of iron and smoke.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 8,
-		"music": "warcamp_theme"
-	},
-	"shadow_hollow": {
-		"desc": "Shadow Hollow: a sunless ravine where lanterns burn violet and whispers cling to stone.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 10,
-		"music": "shadow_theme"
-	},
-	"briar_thicket": {
-		"desc": "Briar Thicket: tangled roots and thorned vines, the wild pressing close around you.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 8,
-		"music": "forest_theme"
-	},
-
-	# Shared forest region
-	"mistwood_edge": {
-		"desc": "Mistwood Edge: ancient trees loom overhead, mist curling around their roots.",
-		"forward": "forest_path",
-		"back": "campfire_rest",
-		"enemy_chance": 15,
-		"music": "forest_theme"
-	},
-	"campfire_rest": {
-		"desc": "A quiet campfire circle, abandoned but still warm. A rare pocket of safety.",
-		"forward": "mistwood_edge",
-		"enemy_chance": 0,
-		"music": "camp_theme"
-	},
-	"forest_path": {
-		"desc": "A narrow path winds deeper into the woods. Strange whispers ride the wind.",
-		"forward": "deep_woods",
-		"left": "wolf_den",
-		"right": "shrine",
-		"back": "mistwood_edge",
-		"enemy_chance": 25,
-		"music": "forest_theme"
-	},
-	"wolf_den": {
-		"desc": "Bones and claw marks litter the ground. This is clearly a predator's lair.",
-		"back": "forest_path",
-		"enemy_chance": 40,
-		"music": "danger_theme"
-	},
-	"shrine": {
-		"desc": "An old stone shrine covered in moss. Faint runes glow with forgotten magic.",
-		"back": "forest_path",
-		"enemy_chance": 15,
-		"music": "mystic_theme"
-	},
-	"deep_woods": {
-		"desc": "The trees grow taller and thicker here. Light barely reaches the forest floor.",
-		"forward": "ruined_tower",
-		"left": "merchant_trail",
-		"right": "dungeon_entrance",
-		"back": "forest_path",
-		"enemy_chance": 35,
-		"music": "forest_deep_theme"
-	},
-	"merchant_trail": {
-		"desc": "A worn trail with cart tracks. You hear the clink of coin and quiet muttering.",
-		"forward": "forest_merchant",
-		"back": "deep_woods",
-		"enemy_chance": 10,
-		"music": "merchant_theme"
-	},
-	"forest_merchant": {
-		"desc": "A robed figure stands beside a cart of goods. The Forest Merchant eyes you carefully.",
-		"back": "merchant_trail",
-		"enemy_chance": 0,
-		"music": "merchant_theme"
-	},
-	"ruined_tower": {
-		"desc": "A crumbling stone tower rises above the treeline. Shadows move in the broken windows.",
-		"forward": "tower_heart",
-		"back": "deep_woods",
-		"enemy_chance": 40,
-		"music": "tower_theme"
-	},
-	"tower_heart": {
-		"desc": "Inside the tower, a cold presence fills the air. This feels like a place of final battles.",
-		"back": "ruined_tower",
-		"enemy_chance": 60,
-		"music": "boss_theme"
-	},
-
-	# Dungeon
-	"dungeon_entrance": {
-		"desc": "A stone arch yawns open into darkness. Faint chanting echoes from within.",
-		"forward": "dungeon_hall",
-		"back": "deep_woods",
-		"enemy_chance": 20,
-		"music": "dungeon_theme"
-	},
-	"dungeon_hall": {
-		"desc": "A long hall lined with broken statues. The air is heavy and still.",
-		"forward": "dungeon_chamber",
-		"back": "dungeon_entrance",
-		"enemy_chance": 40,
-		"music": "dungeon_theme"
-	},
-	"dungeon_chamber": {
-		"desc": "A wide chamber with a cracked floor. You feel eyes on you from the shadows.",
-		"forward": "dungeon_boss_room",
-		"back": "dungeon_hall",
-		"enemy_chance": 50,
-		"music": "dungeon_theme"
-	},
-	"dungeon_boss_room": {
-		"desc": "A vast room dominated by a shattered altar. Power hums in the air.",
-		"back": "dungeon_chamber",
-		"enemy_chance": 80,
-		"music": "boss_theme"
-	}
-}
-
 var current_room = ""
 var game_started = false
 var in_shop = false
@@ -402,6 +140,12 @@ var boss_enemy = {
 }
 
 var enemy = null
+var in_combat: bool:
+	get:
+		return enemy != null
+
+# room id -> true once its boss has been killed; saved with the character
+var defeated_bosses = {}
 
 # ============================
 # READY
@@ -491,10 +235,6 @@ func process_command(cmd):
 
 	var parts = cmd.split(" ")
 	var main = parts[0]
-
-	if enemy != null and main in ["shop", "craft", "equip", "profession", "mount", "pet", "talk"]:
-		log_error("You can't do that during combat.")
-		return
 
 	match main:
 		"move":
@@ -763,14 +503,18 @@ func play_music_cue(tag):
 # ROOM SYSTEM
 # ============================
 func show_room():
-	var room = rooms[current_room]
+	var room = GameDatabase.ROOMS[current_room]
 	$Terminal.append_text("\n[color=cyan]%s[/color]\n" % room["desc"])
 
 	if room.has("music"):
 		play_music_cue(room["music"])
 
-	if current_room == "dungeon_boss_room" and enemy == null:
-		spawn_boss()
+	if room.get("boss", false):
+		if defeated_bosses.get(current_room, false):
+			$Terminal.append_text("%s\n" % room.get("cleared_desc", "This place is quiet now."))
+			return
+		if enemy == null:
+			spawn_boss()
 		return
 
 	if randi() % 100 < room["enemy_chance"]:
@@ -780,7 +524,7 @@ func move(direction):
 	if enemy != null:
 		log_error("You can't walk away from a fight! Use 'flee' to try to escape.")
 		return
-	var room = rooms[current_room]
+	var room = GameDatabase.ROOMS[current_room]
 
 	if room.has(direction):
 		current_room = room[direction]
@@ -814,6 +558,7 @@ func spawn_enemy():
 func spawn_boss():
 	enemy = boss_enemy.duplicate()
 	enemy["max_hp"] = enemy["hp"]
+	enemy["boss_room"] = current_room
 	reset_combat_state()
 	$Terminal.append_text("\n[color=purple]An echo of the Mistlord manifests![/color]\n")
 	$Terminal.append_text("[b]%s[/b]\n" % enemy["ascii"])
@@ -824,26 +569,25 @@ func get_total_attack():
 	var atk = base_attack
 	if has_combat_pet:
 		atk += pet_damage_bonus
-	if gear["weapon"] == "iron_sword":
-		atk += 6
-	if gear["trinket"] == "focus_charm":
-		atk += 2
+	atk += get_gear_bonus("attack_bonus")
 	return atk
 
 func get_total_defense():
 	var def = base_defense
-	if has_talent("juggernaut"):
-		def += 10
-	if has_talent("aura_of_protection"):
-		def += 15
-	if gear["armor"] == "leather_armor":
-		def += 4
-	if gear["trinket"] == "focus_charm":
-		def += 1
+	def += int(talent_mod("armor"))
+	def += get_gear_bonus("defense_bonus")
 	return def
 
 func get_elemental_resist():
-	return 0.10 if has_talent("aura_of_protection") else 0.0
+	return talent_mod("elemental_resist")
+
+func get_gear_bonus(stat):
+	var total = 0
+	for slot in gear.keys():
+		var item_id = gear[slot]
+		if item_id != null and GameDatabase.ITEMS.has(item_id):
+			total += GameDatabase.ITEMS[item_id].get(stat, 0)
+	return total
 
 # ============================
 # COMBAT HELPERS
@@ -863,10 +607,10 @@ func reset_combat_state():
 # Returns {"dmg": int, "crit": bool}. kind is "melee" or "spell".
 func calc_player_damage(raw, kind):
 	var mult = 1.0
-	if kind == "melee" and has_talent("brawler"):
-		mult *= 1.15
-	if has_talent("executioner") and enemy != null and enemy["hp"] < enemy["max_hp"] * 0.3:
-		mult *= 1.3
+	if kind == "melee":
+		mult *= 1.0 + talent_mod("melee_dmg_pct")
+	if enemy != null and enemy["hp"] < enemy["max_hp"] * 0.3:
+		mult *= 1.0 + talent_mod("execute_dmg_pct")
 	if zeal > 0:
 		mult *= 1.0 + 0.03 * zeal
 	if player_debuffs.has("chilled"):
@@ -874,9 +618,8 @@ func calc_player_damage(raw, kind):
 
 	var crit_chance = 0.05
 	var crit_mult = 1.5
-	if has_talent("lethality"):
-		crit_chance += 0.10
-		crit_mult += 0.25
+	crit_chance += talent_mod("crit_chance")
+	crit_mult += talent_mod("crit_damage")
 	if kind == "spell":
 		crit_chance += 0.05 * spellweave_stacks
 	var crit = randf() < crit_chance
@@ -893,6 +636,8 @@ func finish_if_dead(verb):
 	$Terminal.append_text("[color=green]%s is %s![/color]\n" % [enemy["name"], verb])
 	gain_loot()
 	check_quests_on_kill(enemy["name"])
+	if enemy.has("boss_room"):
+		defeated_bosses[enemy["boss_room"]] = true
 	enemy = null
 	reset_combat_state()
 	return true
@@ -913,8 +658,7 @@ func apply_player_debuff(debuff, turns):
 	$Terminal.append_text("[color=gray]You are %s for %d turns.[/color]\n" % [debuff, turns])
 
 func heal_player(amount):
-	if has_talent("blessed_light"):
-		amount = int(amount * 1.2)
+	amount = int(amount * (1.0 + talent_mod("healing_pct")))
 	player_hp = min(player_hp + amount, player_max_hp)
 
 # Applies damage through shield, Arcane Barrier, Zeal and Ironclad. Returns HP lost.
@@ -1000,7 +744,7 @@ func enemy_attack():
 
 	tick_player_timers()
 
-	if has_talent("fleet_footed") and randf() < 0.15:
+	if randf() < talent_mod("evasion"):
 		$Terminal.append_text("[color=cyan]You evade the %s's attack![/color]\n" % enemy["name"])
 		return
 
@@ -1018,8 +762,8 @@ func enemy_attack():
 	if enemy.get("applies_chill", false) and randf() < 0.25:
 		apply_player_debuff("chilled", 2)
 
-	if has_talent("unyielding_sentinel"):
-		var reflected = max(int(mitigated * 0.2), 1)
+	if talent_mod("reflect_pct") > 0.0:
+		var reflected = max(int(mitigated * talent_mod("reflect_pct")), 1)
 		enemy["hp"] -= reflected
 		$Terminal.append_text("[color=cyan]You reflect %d damage back![/color]\n" % reflected)
 		finish_if_dead("defeated")
@@ -1082,8 +826,7 @@ func get_spell_cost(spell):
 		"fire":
 			if player_class == "warden":
 				cost = 8
-	if has_talent("subtle_magic"):
-		cost = int(ceil(cost * 0.8))
+	cost = int(ceil(cost * (1.0 + talent_mod("mana_cost_pct"))))
 	return cost
 
 func cast_spell(spell):
@@ -1161,33 +904,35 @@ func cast_spell(spell):
 # ============================
 func use_item(item):
 	if not inventory.has(item):
-		$Terminal.append_text("You don't have that item.\n")
+		log_error("You don't have that item.")
 		return
-
 	if inventory[item] <= 0:
-		$Terminal.append_text("You're out of %s.\n" % item)
+		log_error("You're out of %s." % item)
 		return
 
-	match item:
-		"potion":
-			heal_player(40)
-			$Terminal.append_text("You drink a potion. HP restored.\n")
-		"ether":
-			player_mana = min(player_mana + 30, player_max_mana)
-			$Terminal.append_text("You use an ether. Mana restored.\n")
-		"healing_draught":
-			heal_player(70)
-			$Terminal.append_text("You drink a potent healing draught. HP greatly restored.\n")
-		_:
-			$Terminal.append_text("You can't use that.\n")
-			return
+	var def = GameDatabase.ITEMS.get(item, {})
+	if def.get("type", "") != "consumable":
+		log_error("You can't use that.")
+		return
 
 	inventory[item] -= 1
+	if def.has("hp"):
+		heal_player(def["hp"])
+	if def.has("mana"):
+		player_mana = min(player_mana + def["mana"], player_max_mana)
+	log_heal(def.get("use_msg", "You use %s." % item))
+
+	# Using an item takes your turn.
+	if in_combat:
+		enemy_attack()
 
 # ============================
 # PROFESSIONS
 # ============================
 func learn_profession(name):
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
 	if not professions.has(name):
 		$Terminal.append_text("Unknown profession.\n")
 		return
@@ -1201,12 +946,28 @@ func learn_profession(name):
 # TALENTS
 # ============================
 func get_class_tiers():
-	if TALENT_TREES.has(player_class):
-		return TALENT_TREES[player_class]["tiers"]
+	if GameDatabase.TALENT_TREES.has(player_class):
+		return GameDatabase.TALENT_TREES[player_class]["tiers"]
 	return []
 
 func has_talent(id):
 	return talent_choices.values().has(id)
+
+func get_talent_option(id):
+	for tier in get_class_tiers():
+		for opt in tier["options"]:
+			if opt["id"] == id:
+				return opt
+	return null
+
+# Sums one modifier (e.g. "armor", "hp_pct") across all chosen talents.
+func talent_mod(key):
+	var total = 0.0
+	for id in talent_choices.values():
+		var opt = get_talent_option(id)
+		if opt != null:
+			total += opt.get("mods", {}).get(key, 0.0)
+	return total
 
 # Flattens the tree into [{"number", "tier", "tier_index", "level", "id", ...}] in display order.
 func get_talent_entries():
@@ -1229,7 +990,7 @@ func find_talent_entry(query):
 func refresh_talent_hp():
 	var base = player_max_hp - talent_hp_bonus
 	var old_max = player_max_hp
-	talent_hp_bonus = int(base * 0.2) if has_talent("juggernaut") else 0
+	talent_hp_bonus = int(base * talent_mod("hp_pct"))
 	player_max_hp = base + talent_hp_bonus
 	if player_max_hp > old_max:
 		player_hp += player_max_hp - old_max
@@ -1257,7 +1018,7 @@ func handle_talents_command(parts):
 
 func show_talent_tree():
 	var tiers = get_class_tiers()
-	$Terminal.append_text("\n[b]=== %s TALENT TREE ===[/b]\n" % TALENT_TREES[player_class]["title"])
+	$Terminal.append_text("\n[b]=== %s TALENT TREE ===[/b]\n" % GameDatabase.TALENT_TREES[player_class]["title"])
 	var n = 1
 	for i in range(tiers.size()):
 		var t = tiers[i]
@@ -1379,6 +1140,9 @@ func cmd_layonhands():
 # MOUNT & PET
 # ============================
 func acquire_mount(name):
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
 	if has_mount:
 		$Terminal.append_text("You already have a mount: %s.\n" % mount_name)
 		return
@@ -1387,6 +1151,9 @@ func acquire_mount(name):
 	$Terminal.append_text("You acquire a mount named %s. Travel feels faster.\n" % mount_name)
 
 func acquire_pet(name):
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
 	if has_combat_pet:
 		$Terminal.append_text("You already have a combat companion: %s.\n" % pet_name)
 		return
@@ -1399,14 +1166,18 @@ func acquire_pet(name):
 # SHOP
 # ============================
 func enter_shop():
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
 	if current_room != "forest_merchant":
 		$Terminal.append_text("You don't see any merchant here.\n")
 		return
 
 	in_shop = true
 	$Terminal.append_text("\n[color=yellow]Forest Merchant[/color]\n")
-	$Terminal.append_text("potion - 20 gold\n")
-	$Terminal.append_text("ether - 30 gold\n")
+	for item_id in GameDatabase.ITEMS.keys():
+		if GameDatabase.ITEMS[item_id].has("shop_price"):
+			$Terminal.append_text("%s - %d gold\n" % [item_id, GameDatabase.ITEMS[item_id]["shop_price"]])
 	$Terminal.append_text("Type: buy potion / buy ether / leave\n")
 
 func process_shop(cmd):
@@ -1421,16 +1192,10 @@ func process_shop(cmd):
 		return
 
 	var item = parts[1]
-	var cost = 0
-
-	match item:
-		"potion":
-			cost = 20
-		"ether":
-			cost = 30
-		_:
-			$Terminal.append_text("The merchant does not sell that.\n")
-			return
+	if not GameDatabase.ITEMS.has(item) or not GameDatabase.ITEMS[item].has("shop_price"):
+		$Terminal.append_text("The merchant does not sell that.\n")
+		return
+	var cost = GameDatabase.ITEMS[item]["shop_price"]
 
 	if player_gold < cost:
 		$Terminal.append_text("You don't have enough gold.\n")
@@ -1447,6 +1212,9 @@ func process_shop(cmd):
 # NPC DIALOGUE
 # ============================
 func talk_to(target):
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
 	if target == "merchant":
 		if current_room != "forest_merchant":
 			$Terminal.append_text("No merchant is nearby.\n")
@@ -1502,16 +1270,19 @@ func turn_in_shrine_offering():
 # ============================
 func show_recipes():
 	$Terminal.append_text("\n[b]Known Recipes:[/b]\n")
-	for name in recipes.keys():
-		var r = recipes[name]
+	for name in GameDatabase.RECIPES.keys():
+		var r = GameDatabase.RECIPES[name]
 		$Terminal.append_text("%s (requires %s)\n" % [name, r["profession"]])
 
 func craft_item(name):
-	if not recipes.has(name):
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
+	if not GameDatabase.RECIPES.has(name):
 		$Terminal.append_text("Unknown recipe.\n")
 		return
 
-	var r = recipes[name]
+	var r = GameDatabase.RECIPES[name]
 	var prof = r["profession"]
 	if not professions.has(prof) or not professions[prof]:
 		$Terminal.append_text("You must learn %s to craft this.\n" % prof)
@@ -1546,6 +1317,9 @@ func craft_item(name):
 # GEAR
 # ============================
 func equip_item(slot, item):
+	if in_combat:
+		log_error("You cannot do that while in combat!")
+		return
 	if not gear.has(slot):
 		$Terminal.append_text("Invalid gear slot.\n")
 		return
@@ -1582,7 +1356,7 @@ func show_inventory():
 # ============================
 # SAVE / LOAD
 # ============================
-const SAVE_VERSION = 2
+const SAVE_VERSION = 3
 const SAVE_PATH = "user://gmud_save.json"
 
 func save_character():
@@ -1608,6 +1382,7 @@ func save_character():
 		"talent_choices": talent_choices,
 		"talent_hp_bonus": talent_hp_bonus,
 		"layonhands_used": layonhands_used,
+		"defeated_bosses": defeated_bosses,
 		"reputation": reputation,
 		"quests": quests,
 		"has_mount": has_mount,
@@ -1682,15 +1457,15 @@ func load_character():
 
 	var cls = save_str(data, "player_class")
 	var fac = save_str(data, "faction")
-	if not TALENT_TREES.has(cls) or not reputation.has(fac):
+	if not GameDatabase.TALENT_TREES.has(cls) or not reputation.has(fac):
 		log_error("Save file is missing a valid class or faction.")
 		return
 	var zone = save_str(data, "starting_zone")
 	var room_id = save_str(data, "current_room")
-	if not rooms.has(zone):
+	if not GameDatabase.ROOMS.has(zone):
 		log_error("Save file has an unknown starting zone.")
 		return
-	if not rooms.has(room_id):
+	if not GameDatabase.ROOMS.has(room_id):
 		room_id = zone
 
 	faction = fac
@@ -1735,6 +1510,12 @@ func load_character():
 					talent_choices[str(idx + 1)] = opt["id"]
 	talent_hp_bonus = save_int(data, "talent_hp_bonus", 0) if not talent_choices.is_empty() else 0
 	layonhands_used = data.get("layonhands_used", false) == true
+	defeated_bosses = {}
+	if typeof(data.get("defeated_bosses")) == TYPE_DICTIONARY:
+		for room_key in data["defeated_bosses"].keys():
+			if GameDatabase.ROOMS.has(room_key) and data["defeated_bosses"][room_key] == true:
+				defeated_bosses[room_key] = true
+	pet_damage_bonus = 5 if has_combat_pet else 0
 
 	enemy = null
 	in_shop = false
