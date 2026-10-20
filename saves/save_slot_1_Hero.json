@@ -1,0 +1,13 @@
+{
+    "character_name": "Hero",
+    "level": 12,
+    "zone": "Mistwood Forest",
+    "timestamp": "2026-10-19 20:51:11",
+    "data": {
+        "level": 12,
+        "current_exp": 0,
+        "exp_to_next_level": 100,
+        "talent_points": 0,
+        "inventory": {}
+    }
+}
