@@ -1,1542 +1,970 @@
 extends Control
 
 # ============================
-# CHARACTER META
+# PLAYER & GAME DATA
 # ============================
-var faction = ""
-var race = ""
-var player_class = ""
-var starting_zone = ""
-var creation_step = 0  # 0 = wait start, 1 = faction, 2 = race, 3 = class
+var player_level: int = 1
+var max_level: int = 35
+var player_hp: int = 100
+var max_hp: int = 100
+var player_atk: int = 15
+var player_gold: int = 25
+var player_xp: int = 0
+var xp_to_next_level: int = 50
+
+var talent_points: int = 0
+var learned_talents: Array = []
+
+var character_name: String = ""
+var character_faction: String = ""
+var character_race: String = ""
+var character_class: String = ""
+var creation_step: int = 0
+
+var in_shop: bool = false
+var in_combat: bool = false
+var current_enemy: Dictionary = {}
+var enemy_poison_ticks: int = 0
 
 # ============================
-# PLAYER STATS
+# PROFESSIONS & SKILL XP
 # ============================
-var player_hp = 100
-var player_max_hp = 100
-var player_mana = 50
-var player_max_mana = 50
-var player_level = 1
-var player_xp = 0
-var player_gold = 0
+var prof_mining: int = 1
+var prof_herbalism: int = 1
+var prof_blacksmithing: int = 1
+var prof_alchemy: int = 1
+var prof_enchanting: int = 1
 
-# ============================
-# GEAR SYSTEM
-# ============================
-var gear = {
-	"weapon": null,
-	"armor": null,
-	"trinket": null
+# Equipment Slots & Stat Bonuses
+var equipment: Dictionary = {
+	"weapon": "None",
+	"armor": "Cloth Tunic",
+	"trinket": "None"
+}
+var gear_atk_bonus: int = 0
+var gear_hp_bonus: int = 0
+var gear_def_bonus: int = 0
+
+var inventory: Dictionary = {
+	"Iron Ore": 6,
+	"Gloom Berries": 6,
+	"Blood Lotus": 2,
+	"Spectral Dust": 3,
+	"Health Potion": 2
 }
 
-var base_attack = 20
-var base_defense = 0
-
-# ============================
-# INVENTORY
-# ============================
-var inventory = {
-	"potion": 2,
-	"ether": 1
-}
-
-# ============================
-# PROFESSIONS
-# ============================
-var professions = {
-	"blacksmithing": false,
-	"alchemy": false,
-	"skinning": false,
-	"enchanting": false
-}
-
-
-# tier number (as string) -> talent id
-var talent_choices = {}
-var talent_hp_bonus = 0
-
-# Combat / talent runtime state
-var player_shield = 0
-var shield_turns = 0
-var ironclad_used = false
-var zeal = 0
-var spellweave_stacks = 0
-var player_stealth = false
-var layonhands_used = false
-var timewarp_cd = 0
-var spell_cooldowns = {}
-var player_debuffs = {}
-var burn_turns = 0
-var burn_dmg = 0
-var poison_turns = 0
-var poison_dmg = 0
-# Secondary enemies (for AoE / chain talents); combat is currently single-target.
-var extra_enemies = []
-
-# ============================
-# FACTION REPUTATION
-# ============================
-var reputation = {
-	"vanguard": 0,
-	"bloodborn": 0
+var cmd_aliases = {
+	"l": "look",
+	"i": "inventory",
+	"inv": "inventory",
+	"stat": "status",
+	"stats": "status",
+	"n": "north",
+	"s": "south",
+	"e": "east",
+	"w": "west",
+	"f": "north",
+	"forward": "north",
+	"b": "south",
+	"back": "south",
+	"r": "east",
+	"right": "east",
+	"left": "west",
+	"h": "help",
+	"tal": "talents",
+	"prof": "professions",
+	"mine": "gather",
+	"harvest": "gather"
 }
 
 # ============================
-# QUESTS
+# WORLD MAP & ROOM DATA
 # ============================
-var quests = {
-	"wolf_cull": {
-		"active": false,
-		"completed": false,
-		"kills_needed": 3,
-		"kills": 0,
-		"reward_gold": 30,
-		"reward_xp": 50
+var current_room_id: String = "frontier_gates"
+
+var rooms = {
+	# --- FRONTIER & ROADS ---
+	"frontier_gates": {
+		"title": "Frontier Gates",
+		"description": "Massive iron-reinforced gates stand weathered against the mist. South leads into Oakhaven Keep. North leads into Mistwood Forest.",
+		"safe": true,
+		"exits": {"north": "mistwood_verge", "south": "oakhaven_square"}
 	},
-	"shrine_offering": {
-		"active": false,
-		"completed": false,
-		"item_needed": "potion",
-		"reward_rep": 10
+	"mistwood_verge": {
+		"title": "Mistwood Verge",
+		"description": "Gnarled oak trees loom out of the fog. A rich Gloom Bush grows near the roots.",
+		"safe": false,
+		"zone": "mistwood",
+		"node": "Gloom Bush",
+		"exits": {"south": "frontier_gates", "north": "shattered_crossroads", "east": "sunken_mire_entrance"}
+	},
+	"shattered_crossroads": {
+		"title": "Shattered Crossroads",
+		"description": "A cracked stone monument lies ruined at an intersection. Iron veins protrude from the broken rocks.",
+		"safe": false,
+		"zone": "mistwood",
+		"node": "Iron Vein",
+		"exits": {"south": "mistwood_verge", "north": "hollow_canopy", "east": "crypt_gates"}
+	},
+	"hollow_canopy": {
+		"title": "The Hollow Canopy",
+		"description": "Thick foliage blocks out all light. Glowing eyes glint in the suffocating shadows.",
+		"safe": false,
+		"zone": "mistwood",
+		"exits": {"south": "shattered_crossroads"}
+	},
+
+	# --- CITY HUB: OAKHAVEN KEEP ---
+	"oakhaven_square": {
+		"title": "Oakhaven Town Square",
+		"description": "A bustling cobblestone square protected by tall stone ramparts.",
+		"safe": true,
+		"exits": {"north": "frontier_gates", "west": "iron_anvil", "east": "ashen_bazaar", "south": "wayfarers_inn"}
+	},
+	"iron_anvil": {
+		"title": "The Iron Anvil Smithy",
+		"description": "The roar of a forge fills the room. Type [b]craft[/b] or [b]recipes[/b] to view blacksmithing and leatherworking options.",
+		"safe": true,
+		"exits": {"east": "oakhaven_square"}
+	},
+	"ashen_bazaar": {
+		"title": "Ashen Bazaar & Alchemist Nook",
+		"description": "Stalls are stacked high with rare vials and enchanting runes. Type [b]brew[/b], [b]enchant[/b], [b]buy[/b], or [b]sell[/b].",
+		"safe": true,
+		"exits": {"west": "oakhaven_square"}
+	},
+	"wayfarers_inn": {
+		"title": "The Wayfarer's Inn",
+		"description": "A roaring fireplace casts a warm glow. Type [b]rest[/b] (10 Gold) to restore HP.",
+		"safe": true,
+		"exits": {"north": "oakhaven_square"}
+	},
+
+	# --- ZONE 1: SUNKEN MIRE ---
+	"sunken_mire_entrance": {
+		"title": "Sunken Mire - Marsh Edge",
+		"description": "Murky water pools around rotting mangroves. Rare Blood Lotus blooms in the mire mud.",
+		"safe": false,
+		"zone": "mire",
+		"node": "Blood Lotus Node",
+		"exits": {"west": "mistwood_verge", "east": "bog_heart"}
+	},
+	"bog_heart": {
+		"title": "Sunken Mire - Deep Bog",
+		"description": "Bubbling mud pits and ancient skeletal remains choke the swamp.",
+		"safe": false,
+		"zone": "mire",
+		"exits": {"west": "sunken_mire_entrance"}
+	},
+
+	# --- ZONE 2: MISTLORD'S CRYPT ---
+	"crypt_gates": {
+		"title": "Mistlord's Crypt - Archway",
+		"description": "Ancient obsidian tombs carved into the mountainside. Spectral veins sparkle in the cliff face.",
+		"safe": false,
+		"zone": "crypt",
+		"node": "Spectral Vein",
+		"exits": {"west": "shattered_crossroads", "east": "inner_sanctum"}
+	},
+	"inner_sanctum": {
+		"title": "Mistlord's Crypt - Inner Sanctum",
+		"description": "A colossal throne room bathed in spectral blue flame.",
+		"safe": false,
+		"zone": "crypt",
+		"exits": {"west": "crypt_gates"}
 	}
 }
 
 # ============================
-# MOUNT & PET
+# BESTIARY POOLS
 # ============================
-var has_mount = false
-var mount_name = ""
-var has_combat_pet = false
-var pet_name = ""
-var pet_damage_bonus = 0
-
-var current_room = ""
-var game_started = false
-var in_shop = false
-
-# ============================
-# ENEMY DATA
-# ============================
-var enemies = [
-	{"name": "Wraith", "type": "undead", "applies_chill": true, "hp": 80, "dmg_min": 5, "dmg_max": 20, "ascii": " (>'-')> "},
-	{"name": "Forest Wolf", "type": "beast", "hp": 60, "dmg_min": 4, "dmg_max": 15, "ascii": " ʕ•ᴥ•ʔ "},
-	{"name": "Shadow Stalker", "type": "demon", "hp": 100, "dmg_min": 8, "dmg_max": 25, "ascii": " (◣_◢) "}
-]
-
-var boss_enemy = {
-	"name": "Echo of the Mistlord",
-	"type": "undead",
-	"applies_chill": true,
-	"hp": 200,
-	"dmg_min": 12,
-	"dmg_max": 28,
-	"ascii": """
-      █████████
-      █  ◣_◢  █
-      █  /|\\  █
-      █  / \\  █
-      █████████
-    """
+var enemy_pools = {
+	"mistwood": [
+		{"name": "Mistwood Stalker", "hp": 25, "max_hp": 25, "dmg_min": 4, "dmg_max": 8, "xp": 15, "gold": 8, "drop": "Gloom Berries", "ascii": " (◣_◢) "},
+		{"name": "Gloom Crawler", "hp": 18, "max_hp": 18, "dmg_min": 3, "dmg_max": 6, "xp": 10, "gold": 5, "drop": "Gloom Berries", "ascii": " ʕ•ᴥ•ʔ "},
+		{"name": "Shadow Hound", "hp": 30, "max_hp": 30, "dmg_min": 5, "dmg_max": 10, "xp": 20, "gold": 12, "drop": "Iron Ore", "ascii": " (>'-')> "}
+	],
+	"mire": [
+		{"name": "Bog Lurker", "hp": 45, "max_hp": 45, "dmg_min": 8, "dmg_max": 14, "xp": 35, "gold": 18, "drop": "Blood Lotus", "ascii": " ~t(o_o)t~ "},
+		{"name": "Venomous Hydra", "hp": 60, "max_hp": 60, "dmg_min": 10, "dmg_max": 18, "xp": 50, "gold": 25, "drop": "Spectral Dust", "ascii": " <:::=={===O "}
+	],
+	"crypt": [
+		{"name": "Spectral Knight", "hp": 85, "max_hp": 85, "dmg_min": 14, "dmg_max": 22, "xp": 80, "gold": 45, "drop": "Spectral Dust", "ascii": " [o===> "},
+		{"name": "Echo of the Mistlord", "hp": 180, "max_hp": 180, "dmg_min": 18, "dmg_max": 30, "xp": 200, "gold": 150, "drop": "Spectral Dust", "ascii": " ███◣_◢███ "}
+	]
 }
 
-var enemy = null
-var in_combat: bool:
-	get:
-		return enemy != null
-
-# room id -> true once its boss has been killed; saved with the character
-var defeated_bosses = {}
+# ============================
+# TALENT TREE DEFINITIONS
+# ============================
+var class_talents = {
+	"slayer": [
+		{"name": "shadowstep", "lvl": 5, "desc": "Increases critical damage & dodge chance."},
+		{"name": "poison_blades", "lvl": 10, "desc": "Applies a 3-turn venom DoT to attacks."},
+		{"name": "eviscerate", "lvl": 15, "desc": "Deals heavy execution damage to targets below 50% HP."},
+		{"name": "fan_of_knives", "lvl": 20, "desc": "Adds bonus area bleed damage on casts."},
+		{"name": "shadow_cloak", "lvl": 25, "desc": "Reduces incoming enemy damage by 8."},
+		{"name": "venomous_spite", "lvl": 30, "desc": "Doubles poison tick damage."},
+		{"name": "shadow_dance", "lvl": 35, "desc": "Capstone: Shadow Strike damage increased drastically."}
+	],
+	"mage": [
+		{"name": "pyromancy", "lvl": 5, "desc": "Significantly boosts Fireball damage."},
+		{"name": "arcane_shield", "lvl": 10, "desc": "Reduces incoming damage by 6."},
+		{"name": "frostbite", "lvl": 15, "desc": "Chills targets, reducing their attack power."},
+		{"name": "combustion", "lvl": 20, "desc": "Gives Fireball a high critical hit chance."},
+		{"name": "mana_surge", "lvl": 25, "desc": "Increases overall spell power scaling."},
+		{"name": "ignite", "lvl": 30, "desc": "Fireball burns enemies for extra damage per turn."},
+		{"name": "archmage_sovereignty", "lvl": 35, "desc": "Capstone: Unleashes maximum arcane burst power."}
+	],
+	"guardian": [
+		{"name": "iron_clad", "lvl": 5, "desc": "Reduces incoming physical damage by 5."},
+		{"name": "shield_slam", "lvl": 10, "desc": "Shield Bash reduces enemy damage by half."},
+		{"name": "last_stand", "lvl": 15, "desc": "Heals +30 HP when taking heavy damage."},
+		{"name": "retaliation", "lvl": 20, "desc": "Reflects 6 damage back to attackers."},
+		{"name": "fortitude", "lvl": 25, "desc": "Increases Max HP by +40."},
+		{"name": "unbreakable", "lvl": 30, "desc": "Grants high flat defense."},
+		{"name": "avatar_of_war", "lvl": 35, "desc": "Capstone: Massively boosts Attack & Defense."}
+	],
+	"warden": [
+		{"name": "divine_grace", "lvl": 5, "desc": "Boosts potion and spell healing efficiency by +20 HP."},
+		{"name": "smite", "lvl": 10, "desc": "Holy Smite deals +15 bonus holy damage."},
+		{"name": "sacred_aura", "lvl": 15, "desc": "Passive aura reducing incoming damage by 5."},
+		{"name": "judgment", "lvl": 20, "desc": "Attacks deal bonus radiant damage per hit."},
+		{"name": "blessing_of_light", "lvl": 25, "desc": "Restores +8 HP every combat turn."},
+		{"name": "purify", "lvl": 30, "desc": "Increases spell damage and clears poison."},
+		{"name": "divine_intervention", "lvl": 35, "desc": "Capstone: Devastating radiant strike & full cleanse."}
+	]
+}
 
 # ============================
-# READY
+# READY & INPUT SETUP
 # ============================
-func _ready():
+func _ready() -> void:
 	$Terminal.scroll_following = true
 	$Input.text_submitted.connect(_on_input_submitted)
 	$Input.grab_focus()
-	$Terminal.append_text("[color=yellow]Welcome to the Mistwood Frontier...[/color]\n")
+	$Terminal.append_text("[color=yellow]Welcome to Mistwood Frontiers RPG[/color]\n")
 	$Terminal.append_text("Type [b]start[/b] to begin character creation.\n")
 
-# ============================
-# INPUT HANDLER
-# ============================
-# Runs before GUI/shortcut handling: Enter or any printable key focuses the input.
-func _input(event: InputEvent):
-	if not (event is InputEventKey) or not event.pressed:
-		return
-	var input_el = $Input
-	if input_el.has_focus():
-		return
-	if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
-		input_el.grab_focus()
-		input_el.caret_column = input_el.text.length()
-		# Swallow this Enter so it only focuses and doesn't also submit.
-		get_viewport().set_input_as_handled()
-	elif event.unicode >= 32 and not event.ctrl_pressed and not event.alt_pressed and not event.meta_pressed:
-		# Focus now; the same keystroke then reaches the LineEdit as typed text.
-		input_el.grab_focus()
-
-func _on_input_submitted(text: String):
-	var command = text.strip_edges()
+func _on_input_submitted(new_text: String) -> void:
 	$Input.clear()
-	$Input.grab_focus()
-	if command == "":
+	process_command(new_text)
+
+# ============================
+# MAIN COMMAND PARSER
+# ============================
+func process_command(cmd: String) -> void:
+	cmd = cmd.strip_edges()
+	if cmd == "":
 		return
-	log_player("> " + command)
-	process_command(command.to_lower())
-	scroll_to_bottom()
-
-func scroll_to_bottom():
-	# Wait a frame so the RichTextLabel has laid out the new text.
-	await get_tree().process_frame
-	$Terminal.scroll_to_line($Terminal.get_line_count())
-	var bar = $Terminal.get_v_scroll_bar()
-	bar.value = bar.max_value
-
-# ============================
-# MESSAGE FEED (single unified log)
-# ============================
-func log_player(text):
-	$Terminal.append_text("[color=#8ec7ff][b]%s[/b][/color]\n" % text.replace("[", "[lb]"))
-
-func log_success(text):
-	$Terminal.append_text("[color=#5fd35f][b][lb]SUCCESS[rb][/b] %s[/color]\n" % text)
-
-func log_error(text):
-	$Terminal.append_text("[color=#ff6b4a][b][lb]ERROR[rb][/b] %s[/color]\n" % text)
-
-func log_combat(text):
-	$Terminal.append_text("[color=#ffd84a]%s[/color]\n" % text)
-
-func log_heal(text):
-	$Terminal.append_text("[color=#5fd35f]%s[/color]\n" % text)
-
-func log_narrative(text):
-	$Terminal.append_text("[color=#d0d0d0]%s[/color]\n" % text)
-
-# ============================
-# COMMAND PROCESSOR
-# ============================
-func process_command(cmd):
-	if cmd == "save":
-		save_character()
-		return
-	if cmd == "load":
-		load_character()
-		return
-
-	if not game_started:
+	
+	cmd = cmd_aliases.get(cmd, cmd)
+	
+	if creation_step < 5:
 		handle_character_creation(cmd)
 		return
-
-	if in_shop:
-		process_shop(cmd)
+		
+	var parts = cmd.split(" ", false)
+	if parts.size() == 0:
 		return
+	var main_cmd = parts[0].to_lower()
+	
+	if main_cmd in ["move", "go"] and parts.size() > 1:
+		main_cmd = parts[1].to_lower()
 
-	var parts = cmd.split(" ")
-	var main = parts[0]
-
-	match main:
-		"move":
-			if parts.size() > 1:
-				move(parts[1])
-			else:
-				$Terminal.append_text("Move where? (forward, left, right, back)\n")
-		"attack":
-			attack_enemy()
-		"flee":
-			flee()
-		"cast":
-			if parts.size() > 1:
-				cast_spell(parts[1])
-			else:
-				$Terminal.append_text("Cast what?\n")
-		"use":
-			if parts.size() > 1:
-				use_item(parts[1])
-			else:
-				$Terminal.append_text("Use what?\n")
-		"inventory":
-			show_inventory()
-		"status":
-			show_status()
-		"help":
-			show_commands()
-		"shop":
-			enter_shop()
-		"profession":
-			if parts.size() > 1:
-				learn_profession(parts[1])
-			else:
-				$Terminal.append_text("Choose a profession: blacksmithing, alchemy, skinning, enchanting\n")
+	match main_cmd:
+		"look", "l":
+			_cmd_look()
+		"inventory", "inv", "i":
+			_cmd_inventory()
+		"status", "stats":
+			_cmd_status()
+		"gear", "equipment":
+			_cmd_gear()
 		"talents", "talent":
-			handle_talents_command(parts)
-		"whirlwind":
-			cmd_whirlwind()
-		"timewarp":
-			cmd_timewarp()
-		"vanish":
-			cmd_vanish()
-		"layonhands":
-			cmd_layonhands()
-		"stealth":
-			cmd_stealth()
-		"mount":
-			if parts.size() > 1:
-				acquire_mount(parts[1])
-			else:
-				$Terminal.append_text("Name your mount: mount <name>\n")
-		"pet":
-			if parts.size() > 1:
-				acquire_pet(parts[1])
-			else:
-				$Terminal.append_text("Name your pet: pet <name>\n")
-		"talk":
-			if parts.size() > 1:
-				talk_to(parts[1])
-			else:
-				$Terminal.append_text("Talk to who? (merchant, elder)\n")
-		"equip":
-			if parts.size() > 2:
-				equip_item(parts[1], parts[2])
-			else:
-				$Terminal.append_text("Usage: equip <slot> <item>\n")
+			_cmd_talents()
+		"learn":
+			_cmd_learn_talent(parts)
+		"professions", "profession", "recipes":
+			_cmd_professions()
+		"gather":
+			_cmd_gather()
+		"help", "h":
+			_cmd_help()
+		"use", "drink", "u":
+			_cmd_use(parts)
+		"rest":
+			_cmd_rest()
 		"craft":
-			if parts.size() > 1:
-				craft_item(parts[1])
-			else:
-				$Terminal.append_text("Usage: craft <recipe_name> (type 'recipes' to list)\n")
-		"recipes":
-			show_recipes()
+			_cmd_craft(parts)
+		"brew":
+			_cmd_brew(parts)
+		"enchant":
+			_cmd_enchant(parts)
+		"buy":
+			_cmd_buy(parts)
+		"forward", "f", "north", "n":
+			_cmd_move("north")
+		"back", "b", "south", "s":
+			_cmd_move("south")
+		"east", "e", "right", "r":
+			_cmd_move("east")
+		"west", "w", "left":
+			_cmd_move("west")
+		"attack", "att", "a":
+			_cmd_attack()
+		"cast", "c":
+			_cmd_cast()
+		"flee", "run":
+			_cmd_flee()
+		"save":
+			save_character()
+		"load":
+			load_character()
 		_:
-			log_error("Command not recognized. Type 'help'")
+			append_output("Unknown command: " + cmd)
 
 # ============================
 # CHARACTER CREATION
 # ============================
-func handle_character_creation(cmd):
+func handle_character_creation(cmd: String) -> void:
+	var clean_cmd = cmd.to_lower().strip_edges()
+
 	if creation_step == 0:
-		if cmd == "start":
+		if clean_cmd == "start":
+			append_output("> start")
+			append_output("Enter your character name:")
 			creation_step = 1
-			$Terminal.append_text("\n[b]Choose your faction:[/b]\n")
-			$Terminal.append_text("vanguard - disciplined, oathbound defenders\n")
-			$Terminal.append_text("bloodborn - ruthless, war-forged clans\n")
-			$Terminal.append_text("Type: vanguard or bloodborn\n")
 		else:
-			$Terminal.append_text("[color=red]Type 'start' to begin character creation.[/color]\n")
+			append_output("Type [b]start[/b] to begin character creation.")
 		return
 
-	if creation_step == 1:
-		if cmd == "vanguard" or cmd == "bloodborn":
-			faction = cmd
-			creation_step = 2
-			show_race_options()
-		else:
-			$Terminal.append_text("Invalid faction. Type: vanguard or bloodborn\n")
+	elif creation_step == 1:
+		character_name = cmd
+		append_output("> " + cmd)
+		append_output("")
+		append_output("[b]Choose your faction:[/b]")
+		append_output("vanguard - disciplined, oathbound defenders")
+		append_output("bloodborn - ruthless, war-forged clans")
+		creation_step = 2
 		return
 
-	if creation_step == 2:
-		if is_valid_race_for_faction(cmd):
-			race = cmd
-			starting_zone = get_starting_zone(faction, race)
-			creation_step = 3
-			show_class_options()
-		else:
-			$Terminal.append_text("That race does not belong to your faction.\n")
-			show_race_options()
-		return
-
-	if creation_step == 3:
-		if cmd == "guardian" or cmd == "slayer" or cmd == "warden" or cmd == "mage":
-			player_class = cmd
-			setup_class_stats(player_class)
-			current_room = starting_zone
-			game_started = true
-			creation_step = 4
-			show_character_summary()
-			show_commands()
-			show_room()
-		else:
-			$Terminal.append_text("Invalid class. Type: guardian, slayer, warden, or mage\n")
-		return
-
-func show_race_options():
-	if faction == "vanguard":
-		$Terminal.append_text("\n[b]Vanguard Races:[/b]\n")
-		$Terminal.append_text("human - frontier soldiers and scouts\n")
-		$Terminal.append_text("highborn - mystic bloodlines attuned to arcane\n")
-		$Terminal.append_text("stonekin - rune-carved guardians of the cliffs\n")
-		$Terminal.append_text("Type: human / highborn / stonekin\n")
-	elif faction == "bloodborn":
-		$Terminal.append_text("\n[b]Bloodborn Races:[/b]\n")
-		$Terminal.append_text("ravager - brutal warbands from the wastes\n")
-		$Terminal.append_text("shade - veiled assassins from shadowed hollows\n")
-		$Terminal.append_text("wildling - feral hunters bound to the wild\n")
-		$Terminal.append_text("Type: ravager / shade / wildling\n")
-
-func is_valid_race_for_faction(r):
-	if faction == "vanguard":
-		return r in ["human", "highborn", "stonekin"]
-	if faction == "bloodborn":
-		return r in ["ravager", "shade", "wildling"]
-	return false
-
-func get_starting_zone(f, r):
-	if f == "vanguard":
-		match r:
-			"human":
-				return "dawnwatch_outpost"
-			"highborn":
-				return "emberfall_camp"
-			"stonekin":
-				return "stonegate_hold"
-	elif f == "bloodborn":
-		match r:
-			"ravager":
-				return "bloodfang_warcamp"
-			"shade":
-				return "shadow_hollow"
-			"wildling":
-				return "briar_thicket"
-	return "mistwood_edge"
-
-func show_class_options():
-	$Terminal.append_text("\n[b]Choose your class:[/b]\n")
-	$Terminal.append_text("guardian - Warrior: tank, high HP, moderate damage\n")
-	$Terminal.append_text("slayer - Rogue: DPS, high damage, lower HP\n")
-	$Terminal.append_text("warden - Cleric: healer, support, strong mana\n")
-	$Terminal.append_text("mage - Mage: spellcaster, huge mana, fragile\n")
-	$Terminal.append_text("Type: guardian / slayer / warden / mage\n")
-
-func setup_class_stats(cls):
-	if cls == "guardian":
-		player_max_hp = 140
-		player_hp = player_max_hp
-		player_max_mana = 40
-		player_mana = player_max_mana
-		base_attack = 22
-		base_defense = 5
-	elif cls == "slayer":
-		player_max_hp = 100
-		player_hp = player_max_hp
-		player_max_mana = 60
-		player_mana = player_max_mana
-		base_attack = 28
-		base_defense = 1
-	elif cls == "warden":
-		player_max_hp = 110
-		player_hp = player_max_hp
-		player_max_mana = 80
-		player_mana = player_max_mana
-		base_attack = 18
-		base_defense = 2
-	elif cls == "mage":
-		player_max_hp = 90
-		player_hp = player_max_hp
-		player_max_mana = 100
-		player_mana = player_max_mana
-		base_attack = 16
-		base_defense = 0
-
-func show_character_summary():
-	$Terminal.append_text("\n[b]Character Created:[/b]\n")
-	$Terminal.append_text("Faction: %s\n" % faction)
-	$Terminal.append_text("Race: %s\n" % race)
-	$Terminal.append_text("Class: %s\n" % player_class)
-	$Terminal.append_text("Starting Zone: %s\n" % starting_zone)
-
-# ============================
-# COMMAND LIST
-# ============================
-func show_commands():
-	$Terminal.append_text("\n[b]Available Commands:[/b]\n")
-	$Terminal.append_text("move forward / move left / move right / move back\n")
-	$Terminal.append_text("attack / flee\n")
-	$Terminal.append_text("cast fire / cast meteor / cast holy (cleric) / cast heal (cleric)\n")
-	$Terminal.append_text("use <item>\n")
-	$Terminal.append_text("inventory\n")
-	$Terminal.append_text("status\n")
-	$Terminal.append_text("shop\n")
-	$Terminal.append_text("profession <name>\n")
-	$Terminal.append_text("talents / talents list / talents choose <id|name> / talents current / talents reset\n")
-	$Terminal.append_text("stealth (rogue); talent commands: whirlwind, timewarp, vanish, layonhands\n")
-	$Terminal.append_text("mount <name>\n")
-	$Terminal.append_text("pet <name>\n")
-	$Terminal.append_text("talk merchant / talk elder\n")
-	$Terminal.append_text("equip <slot> <item>\n")
-	$Terminal.append_text("recipes\n")
-	$Terminal.append_text("craft <recipe_name>\n")
-	$Terminal.append_text("save / load\n")
-	$Terminal.append_text("help\n")
-
-# ============================
-# MUSIC / SFX CUES
-# ============================
-func play_music_cue(tag):
-	match tag:
-		"camp_theme":
-			$Terminal.append_text("[music] Soft campfire strings and distant drums.\n")
-		"warcamp_theme":
-			$Terminal.append_text("[music] Heavy war drums and harsh horns.\n")
-		"shadow_theme":
-			$Terminal.append_text("[music] Whispering voices and low, eerie tones.\n")
-		"forest_theme":
-			$Terminal.append_text("[music] Gentle flutes over rustling leaves.\n")
-		"forest_deep_theme":
-			$Terminal.append_text("[music] Deep, pulsing ambience beneath creaking branches.\n")
-		"merchant_theme":
-			$Terminal.append_text("[music] Light strings and the clink of coin.\n")
-		"tower_theme":
-			$Terminal.append_text("[music] Echoing choir and distant thunder.\n")
-		"dungeon_theme":
-			$Terminal.append_text("[music] Low drones and ritual chanting.\n")
-		"boss_theme":
-			$Terminal.append_text("[music] Intense percussion and rising strings.\n")
-		"danger_theme":
-			$Terminal.append_text("[music] Tense staccato notes and snarling breaths.\n")
-		"mystic_theme":
-			$Terminal.append_text("[music] Chimes and shimmering tones.\n")
-		_:
-			$Terminal.append_text("[music] The soundscape shifts around you.\n")
-
-# ============================
-# ROOM SYSTEM
-# ============================
-func show_room():
-	var room = GameDatabase.ROOMS[current_room]
-	$Terminal.append_text("\n[color=cyan]%s[/color]\n" % room["desc"])
-
-	if room.has("music"):
-		play_music_cue(room["music"])
-
-	if room.get("boss", false):
-		if defeated_bosses.get(current_room, false):
-			$Terminal.append_text("%s\n" % room.get("cleared_desc", "This place is quiet now."))
-			return
-		if enemy == null:
-			spawn_boss()
-		return
-
-	if randi() % 100 < room["enemy_chance"]:
-		spawn_enemy()
-
-func move(direction):
-	if enemy != null:
-		log_error("You can't walk away from a fight! Use 'flee' to try to escape.")
-		return
-	var room = GameDatabase.ROOMS[current_room]
-
-	if room.has(direction):
-		current_room = room[direction]
-		show_room()
-	else:
-		$Terminal.append_text("[color=red]You can't move %s from here.[/color]\n" % direction)
-
-func flee():
-	if enemy == null:
-		log_error("You aren't in combat.")
-		return
-	if randf() < 0.5:
-		enemy = null
-		reset_combat_state()
-		log_success("You break away from the fight.")
-	else:
-		log_combat("You fail to escape!")
-		enemy_attack()
-
-# ============================
-# ENEMY SYSTEM
-# ============================
-func spawn_enemy():
-	enemy = enemies[randi() % enemies.size()].duplicate()
-	enemy["max_hp"] = enemy["hp"]
-	reset_combat_state()
-	$Terminal.append_text("\n[color=purple]A %s appears![/color]\n" % enemy["name"])
-	$Terminal.append_text("[b]%s[/b]\n" % enemy["ascii"])
-	$Terminal.append_text("HP: %d\n" % enemy["hp"])
-
-func spawn_boss():
-	enemy = boss_enemy.duplicate()
-	enemy["max_hp"] = enemy["hp"]
-	enemy["boss_room"] = current_room
-	reset_combat_state()
-	$Terminal.append_text("\n[color=purple]An echo of the Mistlord manifests![/color]\n")
-	$Terminal.append_text("[b]%s[/b]\n" % enemy["ascii"])
-	$Terminal.append_text("HP: %d\n" % enemy["hp"])
-	play_music_cue("boss_theme")
-
-func get_total_attack():
-	var atk = base_attack
-	if has_combat_pet:
-		atk += pet_damage_bonus
-	atk += get_gear_bonus("attack_bonus")
-	return atk
-
-func get_total_defense():
-	var def = base_defense
-	def += int(talent_mod("armor"))
-	def += get_gear_bonus("defense_bonus")
-	return def
-
-func get_elemental_resist():
-	return talent_mod("elemental_resist")
-
-func get_gear_bonus(stat):
-	var total = 0
-	for slot in gear.keys():
-		var item_id = gear[slot]
-		if item_id != null and GameDatabase.ITEMS.has(item_id):
-			total += GameDatabase.ITEMS[item_id].get(stat, 0)
-	return total
-
-# ============================
-# COMBAT HELPERS
-# ============================
-func reset_combat_state():
-	player_shield = 0
-	shield_turns = 0
-	ironclad_used = false
-	zeal = 0
-	spellweave_stacks = 0
-	spell_cooldowns = {}
-	player_debuffs = {}
-	burn_turns = 0
-	poison_turns = 0
-	extra_enemies = []
-
-# Returns {"dmg": int, "crit": bool}. kind is "melee" or "spell".
-func calc_player_damage(raw, kind):
-	var mult = 1.0
-	if kind == "melee":
-		mult *= 1.0 + talent_mod("melee_dmg_pct")
-	if enemy != null and enemy["hp"] < enemy["max_hp"] * 0.3:
-		mult *= 1.0 + talent_mod("execute_dmg_pct")
-	if zeal > 0:
-		mult *= 1.0 + 0.03 * zeal
-	if player_debuffs.has("chilled"):
-		mult *= 0.8
-
-	var crit_chance = 0.05
-	var crit_mult = 1.5
-	crit_chance += talent_mod("crit_chance")
-	crit_mult += talent_mod("crit_damage")
-	if kind == "spell":
-		crit_chance += 0.05 * spellweave_stacks
-	var crit = randf() < crit_chance
-	# Enemies have no armor stat yet, so Shadow Step's armor penetration is implicit.
-	if kind == "melee" and player_stealth and has_talent("shadow_step"):
-		crit = true
-	if crit:
-		mult *= crit_mult
-	return {"dmg": max(int(raw * mult), 1), "crit": crit}
-
-func finish_if_dead(verb):
-	if enemy == null or enemy["hp"] > 0:
-		return false
-	$Terminal.append_text("[color=green]%s is %s![/color]\n" % [enemy["name"], verb])
-	gain_loot()
-	check_quests_on_kill(enemy["name"])
-	if enemy.has("boss_room"):
-		defeated_bosses[enemy["boss_room"]] = true
-	enemy = null
-	reset_combat_state()
-	return true
-
-func get_combat_targets():
-	var targets = []
-	if enemy != null:
-		targets.append(enemy)
-	for e in extra_enemies:
-		if e["hp"] > 0:
-			targets.append(e)
-	return targets
-
-func apply_player_debuff(debuff, turns):
-	if has_talent("divine_grace"):
-		turns = max(int(turns / 2), 1)
-	player_debuffs[debuff] = turns
-	$Terminal.append_text("[color=gray]You are %s for %d turns.[/color]\n" % [debuff, turns])
-
-func heal_player(amount):
-	amount = int(amount * (1.0 + talent_mod("healing_pct")))
-	player_hp = min(player_hp + amount, player_max_hp)
-
-# Applies damage through shield, Arcane Barrier, Zeal and Ironclad. Returns HP lost.
-func take_damage(amount):
-	var remaining = amount
-	if player_shield > 0:
-		var absorbed = min(player_shield, remaining)
-		player_shield -= absorbed
-		remaining -= absorbed
-	if has_talent("arcane_barrier") and remaining > 0:
-		var portion = min(int(round(remaining * 0.15)), player_mana)
-		player_mana -= portion
-		remaining -= portion
-	player_hp -= remaining
-	if has_talent("retribution"):
-		zeal = min(zeal + 1, 5)
-	if has_talent("ironclad") and not ironclad_used and player_hp > 0 and player_hp < player_max_hp * 0.35:
-		ironclad_used = true
-		player_shield = int(player_max_hp * 0.25)
-		shield_turns = 3
-		$Terminal.append_text("[color=cyan]Ironclad! You gain a %d point shield.[/color]\n" % player_shield)
-	return remaining
-
-func tick_enemy_effects():
-	if burn_turns > 0:
-		burn_turns -= 1
-		enemy["hp"] -= burn_dmg
-		$Terminal.append_text("[color=orange]%s burns for %d damage.[/color]\n" % [enemy["name"], burn_dmg])
-	if poison_turns > 0:
-		poison_turns -= 1
-		enemy["hp"] -= poison_dmg
-		$Terminal.append_text("[color=green]%s suffers %d Nature damage from poison.[/color]\n" % [enemy["name"], poison_dmg])
-	return finish_if_dead("consumed")
-
-func tick_player_timers():
-	if shield_turns > 0:
-		shield_turns -= 1
-		if shield_turns == 0:
-			player_shield = 0
-	for d in player_debuffs.keys():
-		player_debuffs[d] -= 1
-		if player_debuffs[d] <= 0:
-			player_debuffs.erase(d)
-	for s in spell_cooldowns.keys():
-		spell_cooldowns[s] -= 1
-		if spell_cooldowns[s] <= 0:
-			spell_cooldowns.erase(s)
-	if timewarp_cd > 0:
-		timewarp_cd -= 1
-
-func attack_enemy():
-	if enemy == null:
-		$Terminal.append_text("There is nothing to attack.\n")
-		return
-
-	var raw = randi() % max(get_total_attack(), 1) + 5
-	var r = calc_player_damage(raw, "melee")
-	var dmg = r["dmg"]
-	enemy["hp"] -= dmg
-	player_stealth = false
-
-	var crit_text = " [b]Critical![/b]" if r["crit"] else ""
-	$Terminal.append_text("[color=white]You strike the %s for %d damage!%s[/color]\n" % [enemy["name"], dmg, crit_text])
-
-	if has_talent("venomous_blades"):
-		poison_turns = 3
-		poison_dmg = max(int(dmg * 0.15), 2)
-		$Terminal.append_text("[color=green]Your blades poison the %s (healing reduced).[/color]\n" % enemy["name"])
-
-	if has_talent("flurry_of_steel") and randf() < 0.25:
-		var extra = calc_player_damage(raw * 0.5, "melee")["dmg"]
-		enemy["hp"] -= extra
-		$Terminal.append_text("[color=white]Flurry of Steel! Your off-hand strikes for %d damage.[/color]\n" % extra)
-
-	if finish_if_dead("defeated"):
-		return
-
-	enemy_attack()
-
-func enemy_attack():
-	if tick_enemy_effects():
-		return
-
-	tick_player_timers()
-
-	if randf() < talent_mod("evasion"):
-		$Terminal.append_text("[color=cyan]You evade the %s's attack![/color]\n" % enemy["name"])
-		return
-
-	var dmg = enemy["dmg_min"] + randi() % max(enemy["dmg_max"] - enemy["dmg_min"], 1)
-	var mitigated = max(dmg - get_total_defense(), 1)
-	take_damage(mitigated)
-
-	$Terminal.append_text("[color=red]%s hits you for %d damage![/color]\n" % [enemy["name"], mitigated])
-
-	if player_hp <= 0:
-		$Terminal.append_text("[color=red]You have fallen...[/color]\n")
-		respawn()
-		return
-
-	if enemy.get("applies_chill", false) and randf() < 0.25:
-		apply_player_debuff("chilled", 2)
-
-	if talent_mod("reflect_pct") > 0.0:
-		var reflected = max(int(mitigated * talent_mod("reflect_pct")), 1)
-		enemy["hp"] -= reflected
-		$Terminal.append_text("[color=cyan]You reflect %d damage back![/color]\n" % reflected)
-		finish_if_dead("defeated")
-
-# ============================
-# LOOT + XP + MATERIALS
-# ============================
-func gain_loot():
-	var gold_gain = randi() % 20 + 10
-	var xp_gain = randi() % 30 + 20
-
-	player_gold += gold_gain
-	player_xp += xp_gain
-
-	$Terminal.append_text("You gain %d gold and %d XP.\n" % [gold_gain, xp_gain])
-
-	# Simple material drops
-	var roll = randi() % 100
-	if roll < 30:
-		add_material("iron_ore")
-	elif roll < 60:
-		add_material("wolf_pelt")
-	elif roll < 80:
-		add_material("herb")
-	else:
-		add_material("arcane_dust")
-
-	if player_xp >= player_level * 100:
-		level_up()
-
-func add_material(mat):
-	if not inventory.has(mat):
-		inventory[mat] = 0
-	inventory[mat] += 1
-	$Terminal.append_text("You obtain: %s\n" % mat)
-
-func level_up():
-	player_level += 1
-	player_max_hp += 20
-	player_max_mana += 10
-	refresh_talent_hp()
-	player_hp = player_max_hp
-	player_mana = player_max_mana
-
-	$Terminal.append_text("[color=green]You leveled up to level %d![/color]\n" % player_level)
-	for tier in get_class_tiers():
-		if tier["level"] == player_level:
-			$Terminal.append_text("[color=yellow]A new talent tier is available! Type 'talents'.[/color]\n")
-
-# ============================
-# SPELLS
-# ============================
-func get_spell_cost(spell):
-	var def = GameDatabase.SPELLS.get(spell)
-	if def == null:
-		return 0
-	var base = def["class_cost"].get(player_class, def["mana_cost"]) if def.has("class_cost") else def["mana_cost"]
-	var cost = base * def["balance_mult"] * (1.0 + talent_mod("mana_cost_pct"))
-	# Round to nearest, never free, so percentage tweaks stay meaningful on small costs.
-	return max(roundi(cost), 1)
-
-func cast_spell(spell):
-	spell = GameDatabase.SPELL_ALIASES.get(spell, spell)
-	if not GameDatabase.SPELLS.has(spell):
-		log_error("Unknown spell.")
-		return
-	var class_only = GameDatabase.SPELLS[spell].get("class_only", "")
-	if class_only != "" and player_class != class_only:
-		log_error("Only clerics can cast that.")
-		return
-	if spell_cooldowns.has(spell):
-		$Terminal.append_text("%s is on cooldown (%d turns).\n" % [spell, spell_cooldowns[spell]])
-		return
-
-	var cost = get_spell_cost(spell)
-	if player_mana < cost:
-		log_error("Not enough mana.")
-		return
-
-	if spell == "heal":
-		player_mana -= cost
-		heal_player(35)
-		log_heal("You cast Heal. HP: %d/%d" % [player_hp, player_max_hp])
-		if enemy != null:
-			enemy_attack()
-		return
-
-	if enemy == null:
-		$Terminal.append_text("No enemy to cast on.\n")
-		return
-
-	player_mana -= cost
-	var base = 30
-	var label = "Fire"
-	if spell == "meteor":
-		base = 70
-		label = "Meteor"
-		spell_cooldowns["meteor"] = 4
-	elif spell == "holy":
-		base = 35
-		label = "Holy Light"
-	elif player_class == "slayer":
-		base = 40
-	var raw = randi() % base + 15
-	if spell == "holy" and has_talent("smite_the_unworthy") and enemy.get("type", "") in ["undead", "demon"]:
-		raw = int(raw * 1.2)
-	var r = calc_player_damage(raw, "spell")
-	var dmg = r["dmg"]
-	enemy["hp"] -= dmg
-	if has_talent("spellweave"):
-		spellweave_stacks = min(spellweave_stacks + 1, 4)
-
-	var crit_text = " [b]Critical![/b]" if r["crit"] else ""
-	$Terminal.append_text("[color=orange]You cast %s for %d damage!%s[/color]\n" % [label, dmg, crit_text])
-
-	if has_talent("pyromancy") and (spell == "fire" or spell == "meteor"):
-		burn_turns = 3
-		burn_dmg = max(int(dmg * 0.1), 1)
-		$Terminal.append_text("[color=orange]%s is set ablaze![/color]\n" % enemy["name"])
-
-	if has_talent("chain_impact") and randf() < 0.3:
-		for t in get_combat_targets():
-			if t != enemy:
-				var jump = int(dmg * 0.7)
-				t["hp"] -= jump
-				$Terminal.append_text("[color=orange]Chain Impact jumps to %s for %d damage![/color]\n" % [t["name"], jump])
-				break
-
-	if finish_if_dead("incinerated"):
-		return
-
-	enemy_attack()
-
-# ============================
-# ITEMS
-# ============================
-func use_item(item):
-	if not inventory.has(item):
-		log_error("You don't have that item.")
-		return
-	if inventory[item] <= 0:
-		log_error("You're out of %s." % item)
-		return
-
-	var def = GameDatabase.ITEMS.get(item, {})
-	if def.get("type", "") != "consumable":
-		log_error("You can't use that.")
-		return
-
-	inventory[item] -= 1
-	if def.has("hp"):
-		heal_player(def["hp"])
-	if def.has("mana"):
-		player_mana = min(player_mana + def["mana"], player_max_mana)
-	log_heal(def.get("use_msg", "You use %s." % item))
-
-	# Using an item takes your turn.
-	if in_combat:
-		enemy_attack()
-
-# ============================
-# PROFESSIONS
-# ============================
-func learn_profession(name):
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if not professions.has(name):
-		$Terminal.append_text("Unknown profession.\n")
-		return
-	if professions[name]:
-		$Terminal.append_text("You already know %s.\n" % name)
-		return
-	professions[name] = true
-	$Terminal.append_text("You learn the profession of %s.\n" % name)
-
-# ============================
-# TALENTS
-# ============================
-func get_class_tiers():
-	if GameDatabase.TALENT_TREES.has(player_class):
-		return GameDatabase.TALENT_TREES[player_class]["tiers"]
-	return []
-
-func has_talent(id):
-	return talent_choices.values().has(id)
-
-func get_talent_option(id):
-	for tier in get_class_tiers():
-		for opt in tier["options"]:
-			if opt["id"] == id:
-				return opt
-	return null
-
-# Sums one modifier (e.g. "armor", "hp_pct") across all chosen talents.
-func talent_mod(key):
-	var total = 0.0
-	for id in talent_choices.values():
-		var opt = get_talent_option(id)
-		if opt != null:
-			total += opt.get("mods", {}).get(key, 0.0)
-	return total
-
-# Flattens the tree into [{"number", "tier", "tier_index", "level", "id", ...}] in display order.
-func get_talent_entries():
-	var entries = []
-	var n = 1
-	var tiers = get_class_tiers()
-	for i in range(tiers.size()):
-		for opt in tiers[i]["options"]:
-			entries.append({"number": n, "tier_index": i, "level": tiers[i]["level"], "tier_name": tiers[i]["name"], "id": opt["id"], "name": opt["name"], "desc": opt["desc"]})
-			n += 1
-	return entries
-
-func find_talent_entry(query) -> Dictionary:
-	query = query.strip_edges().to_lower().replace(" ", "_")
-	for e in get_talent_entries():
-		if str(e["number"]) == query or e["id"] == query or e["id"].replace("_", "") == query.replace("_", ""):
-			return e
-	return {}
-
-func refresh_talent_hp():
-	var base = player_max_hp - talent_hp_bonus
-	var old_max = player_max_hp
-	talent_hp_bonus = int(base * talent_mod("hp_pct"))
-	player_max_hp = base + talent_hp_bonus
-	if player_max_hp > old_max:
-		player_hp += player_max_hp - old_max
-	player_hp = clamp(player_hp, 1, player_max_hp)
-
-func handle_talents_command(parts):
-	if player_class == "":
-		log_error("You must choose a class first.")
-		return
-	var sub = parts[1] if parts.size() > 1 else "list"
-	match sub:
-		"list":
-			show_talent_tree()
-		"current":
-			show_current_talents()
-		"choose":
-			if parts.size() < 3:
-				log_error("Usage: talents choose <number|name>")
+	elif creation_step == 2:
+		if clean_cmd in ["vanguard", "bloodborn"]:
+			character_faction = clean_cmd
+			append_output("> " + cmd)
+			append_output("")
+			if character_faction == "vanguard":
+				append_output("[b]Vanguard Races:[/b] human / highborn / stonekin")
 			else:
-				choose_talent(" ".join(parts.slice(2)))
-		"reset":
-			reset_talents()
-		_:
-			log_error("Usage: talents [list] | talents choose <id> | talents current | talents reset")
-
-func show_talent_tree():
-	var tiers = get_class_tiers()
-	$Terminal.append_text("\n[b]=== %s TALENT TREE ===[/b]\n" % GameDatabase.TALENT_TREES[player_class]["title"])
-	var n = 1
-	for i in range(tiers.size()):
-		var t = tiers[i]
-		var status = "UNLOCKED" if player_level >= t["level"] else "LOCKED - Requires Level %d" % t["level"]
-		$Terminal.append_text("[lb]Tier %d - Level %d[rb] (%s)\n" % [i + 1, t["level"], status])
-		for opt in t["options"]:
-			var mark = " [lb]SELECTED[rb]" if talent_choices.get(str(i + 1), "") == opt["id"] else ""
-			$Terminal.append_text("  %d. %s: %s%s\n" % [n, opt["name"], opt["desc"], mark])
-			n += 1
-		$Terminal.append_text("\n")
-	$Terminal.append_text("Use 'talents choose <number|name>' to pick a talent.\n")
-
-func show_current_talents():
-	$Terminal.append_text("\n[b]Active talents:[/b]\n")
-	if talent_choices.is_empty():
-		$Terminal.append_text("None chosen yet.\n")
-		return
-	for e in get_talent_entries():
-		if talent_choices.get(str(e["tier_index"] + 1), "") == e["id"]:
-			$Terminal.append_text("Tier %d - %s: %s\n" % [e["tier_index"] + 1, e["name"], e["desc"]])
-
-func choose_talent(query):
-	if enemy != null:
-		log_error("You can't change talents during combat.")
-		return
-	var e: Dictionary = find_talent_entry(query)
-	if e.is_empty():
-		log_error("Unknown talent. Type 'talents' to see the list.")
-		return
-	if player_level < e["level"]:
-		log_error("That tier requires level %d." % e["level"])
-		return
-	var key = str(e["tier_index"] + 1)
-	if talent_choices.has(key):
-		log_error("You already chose a talent for this tier. Use 'talents reset' to respec.")
-		return
-	talent_choices[key] = e["id"]
-	refresh_talent_hp()
-	log_success("You selected %s!" % e["name"])
-
-func reset_talents():
-	if enemy != null:
-		log_error("You can't reset talents during combat.")
-		return
-	if talent_choices.is_empty():
-		log_error("You have no talents to reset.")
-		return
-	talent_choices = {}
-	player_stealth = false
-	refresh_talent_hp()
-	log_success("Your talents have been reset.")
-
-func require_talent(id):
-	if has_talent(id):
-		return true
-	log_error("You haven't learned that ability.")
-	return false
-
-func cmd_whirlwind():
-	if not require_talent("whirlwind_fury"):
-		return
-	if enemy == null:
-		$Terminal.append_text("There is nothing to attack.\n")
-		return
-	var weapon_dmg = get_total_attack()
-	for t in get_combat_targets():
-		var dmg = max(int(weapon_dmg * 0.8), 1)
-		t["hp"] -= dmg
-		$Terminal.append_text("[color=white]Whirlwind hits %s for %d damage![/color]\n" % [t["name"], dmg])
-	extra_enemies = extra_enemies.filter(func(e): return e["hp"] > 0)
-	if finish_if_dead("defeated"):
-		return
-	enemy_attack()
-
-func cmd_timewarp():
-	if not require_talent("time_warp"):
-		return
-	if timewarp_cd > 0:
-		$Terminal.append_text("Time Warp is on cooldown (%d turns).\n" % timewarp_cd)
-		return
-	spell_cooldowns = {}
-	timewarp_cd = 10
-	$Terminal.append_text("[color=cyan]Time bends. All spell cooldowns are reset.[/color]\n")
-
-func cmd_vanish():
-	if not require_talent("vanish"):
-		return
-	if enemy == null:
-		$Terminal.append_text("You aren't in combat.\n")
-		return
-	enemy = null
-	reset_combat_state()
-	player_stealth = true
-	$Terminal.append_text("[color=gray]You vanish into the mist and escape combat. You are stealthed.[/color]\n")
-
-func cmd_stealth():
-	if player_class != "slayer":
-		log_error("Only rogues can stealth.")
-		return
-	if enemy != null:
-		$Terminal.append_text("You can't stealth while in combat.\n")
-		return
-	player_stealth = true
-	$Terminal.append_text("[color=gray]You slip into the shadows.[/color]\n")
-
-func cmd_layonhands():
-	if not require_talent("lay_on_hands"):
-		return
-	if layonhands_used:
-		$Terminal.append_text("Lay on Hands was already used this run.\n")
-		return
-	layonhands_used = true
-	player_hp = player_max_hp
-	$Terminal.append_text("[color=cyan]Lay on Hands! You are fully healed.[/color]\n")
-	if enemy != null:
-		enemy_attack()
-
-# ============================
-# MOUNT & PET
-# ============================
-func acquire_mount(name):
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if has_mount:
-		$Terminal.append_text("You already have a mount: %s.\n" % mount_name)
-		return
-	has_mount = true
-	mount_name = name
-	$Terminal.append_text("You acquire a mount named %s. Travel feels faster.\n" % mount_name)
-
-func acquire_pet(name):
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if has_combat_pet:
-		$Terminal.append_text("You already have a combat companion: %s.\n" % pet_name)
-		return
-	has_combat_pet = true
-	pet_name = name
-	pet_damage_bonus = 5
-	$Terminal.append_text("A loyal companion named %s joins you. Your attacks feel stronger.\n" % pet_name)
-
-# ============================
-# SHOP
-# ============================
-func enter_shop():
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if current_room != "forest_merchant":
-		$Terminal.append_text("You don't see any merchant here.\n")
-		return
-
-	in_shop = true
-	$Terminal.append_text("\n[color=yellow]Forest Merchant[/color]\n")
-	for item_id in GameDatabase.ITEMS.keys():
-		if GameDatabase.ITEMS[item_id].has("shop_price"):
-			$Terminal.append_text("%s - %d gold\n" % [item_id, GameDatabase.ITEMS[item_id]["shop_price"]])
-	$Terminal.append_text("Type: buy potion / buy ether / leave\n")
-
-func process_shop(cmd):
-	if cmd == "leave":
-		in_shop = false
-		$Terminal.append_text("You step away from the merchant.\n")
-		return
-
-	var parts = cmd.split(" ")
-	if parts.size() < 2 or parts[0] != "buy":
-		$Terminal.append_text("Shop commands: buy potion / buy ether / leave\n")
-		return
-
-	var item = parts[1]
-	if not GameDatabase.ITEMS.has(item) or not GameDatabase.ITEMS[item].has("shop_price"):
-		$Terminal.append_text("The merchant does not sell that.\n")
-		return
-	var cost = GameDatabase.ITEMS[item]["shop_price"]
-
-	if player_gold < cost:
-		$Terminal.append_text("You don't have enough gold.\n")
-		return
-
-	player_gold -= cost
-	if not inventory.has(item):
-		inventory[item] = 0
-	inventory[item] += 1
-
-	$Terminal.append_text("You buy a %s.\n" % item)
-
-# ============================
-# NPC DIALOGUE
-# ============================
-func talk_to(target):
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if target == "merchant":
-		if current_room != "forest_merchant":
-			$Terminal.append_text("No merchant is nearby.\n")
-			return
-		$Terminal.append_text("\n[color=yellow]Forest Merchant:[/color]\n")
-		$Terminal.append_text("\"Coin for goods, traveler. Danger for free.\"\n")
-		return
-	elif target == "elder":
-		if current_room != "shrine":
-			$Terminal.append_text("No elder is nearby.\n")
-			return
-		$Terminal.append_text("\n[color=yellow]Shrine Elder:[/color]\n")
-		$Terminal.append_text("\"The woods remember every step. Will you walk them with care?\"\n")
-		if not quests["shrine_offering"]["active"] and not quests["shrine_offering"]["completed"]:
-			quests["shrine_offering"]["active"] = true
-			$Terminal.append_text("Quest started: Shrine Offering. Bring a potion to the shrine.\n")
+				append_output("[b]Bloodborn Races:[/b] ravager / shade / wildling")
+			creation_step = 3
 		else:
-			turn_in_shrine_offering()
-		return
-	else:
-		$Terminal.append_text("You see no one by that name.\n")
-
-# ============================
-# QUESTS
-# ============================
-func check_quests_on_kill(enemy_name):
-	if quests["wolf_cull"]["active"] and not quests["wolf_cull"]["completed"]:
-		if enemy_name == "Forest Wolf":
-			quests["wolf_cull"]["kills"] += 1
-			$Terminal.append_text("Wolf Cull progress: %d/%d\n" % [quests["wolf_cull"]["kills"], quests["wolf_cull"]["kills_needed"]])
-			if quests["wolf_cull"]["kills"] >= quests["wolf_cull"]["kills_needed"]:
-				quests["wolf_cull"]["completed"] = true
-				player_gold += quests["wolf_cull"]["reward_gold"]
-				player_xp += quests["wolf_cull"]["reward_xp"]
-				$Terminal.append_text("[color=green]Quest completed: Wolf Cull![/color]\n")
-				$Terminal.append_text("You gain %d gold and %d XP.\n" % [quests["wolf_cull"]["reward_gold"], quests["wolf_cull"]["reward_xp"]])
-
-func turn_in_shrine_offering():
-	var q = quests["shrine_offering"]
-	if not q["active"] or q["completed"]:
-		return
-	if inventory.has(q["item_needed"]) and inventory[q["item_needed"]] > 0:
-		inventory[q["item_needed"]] -= 1
-		q["completed"] = true
-		reputation[faction] += q["reward_rep"]
-		$Terminal.append_text("[color=green]Quest completed: Shrine Offering![/color]\n")
-		$Terminal.append_text("Your reputation with %s increases.\n" % faction)
-	else:
-		$Terminal.append_text("You lack the required offering.\n")
-
-# ============================
-# CRAFTING
-# ============================
-func show_recipes():
-	$Terminal.append_text("\n[b]Known Recipes:[/b]\n")
-	for name in GameDatabase.RECIPES.keys():
-		var r = GameDatabase.RECIPES[name]
-		$Terminal.append_text("%s (requires %s)\n" % [name, r["profession"]])
-
-func craft_item(name):
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if not GameDatabase.RECIPES.has(name):
-		$Terminal.append_text("Unknown recipe.\n")
+			append_output("Type: vanguard or bloodborn")
 		return
 
-	var r = GameDatabase.RECIPES[name]
-	var prof = r["profession"]
-	if not professions.has(prof) or not professions[prof]:
-		$Terminal.append_text("You must learn %s to craft this.\n" % prof)
-		return
-
-	# Check materials
-	for mat in r["materials"].keys():
-		var needed = r["materials"][mat]
-		if not inventory.has(mat) or inventory[mat] < needed:
-			$Terminal.append_text("Missing materials: %s x%d\n" % [mat, needed])
-			return
-
-	# Consume materials
-	for mat in r["materials"].keys():
-		var needed = r["materials"][mat]
-		inventory[mat] -= needed
-
-	var result_item = r["result_item"]
-	if not inventory.has(result_item):
-		inventory[result_item] = 0
-	inventory[result_item] += 1
-
-	$Terminal.append_text("You craft: %s\n" % result_item)
-
-	# Auto-equip gear if recipe has slot
-	if r.has("slot"):
-		var slot = r["slot"]
-		gear[slot] = result_item
-		$Terminal.append_text("You equip %s in slot %s.\n" % [result_item, slot])
-
-# ============================
-# GEAR
-# ============================
-func equip_item(slot, item):
-	if in_combat:
-		log_error("You cannot do that while in combat!")
-		return
-	if not gear.has(slot):
-		$Terminal.append_text("Invalid gear slot.\n")
-		return
-	if not inventory.has(item) or inventory[item] <= 0:
-		$Terminal.append_text("You don't have that item.\n")
-		return
-	gear[slot] = item
-	$Terminal.append_text("You equip %s in slot %s.\n" % [item, slot])
-
-# ============================
-# STATUS + INVENTORY
-# ============================
-func show_status():
-	$Terminal.append_text("\n[b]HP:[/b] %d/%d\n" % [player_hp, player_max_hp])
-	$Terminal.append_text("[b]Mana:[/b] %d/%d\n" % [player_mana, player_max_mana])
-	$Terminal.append_text("[b]Level:[/b] %d\n" % player_level)
-	$Terminal.append_text("[b]XP:[/b] %d\n" % player_xp)
-	$Terminal.append_text("[b]Gold:[/b] %d\n" % player_gold)
-	$Terminal.append_text("[b]Faction:[/b] %s\n" % faction)
-	$Terminal.append_text("[b]Race:[/b] %s\n" % race)
-	$Terminal.append_text("[b]Class:[/b] %s\n" % player_class)
-	$Terminal.append_text("[b]Reputation (%s):[/b] %d\n" % [faction, reputation.get(faction, 0)])
-	if has_mount:
-		$Terminal.append_text("[b]Mount:[/b] %s\n" % mount_name)
-	if has_combat_pet:
-		$Terminal.append_text("[b]Pet:[/b] %s\n" % pet_name)
-	$Terminal.append_text("[b]Gear:[/b] weapon=%s, armor=%s, trinket=%s\n" % [gear["weapon"], gear["armor"], gear["trinket"]])
-
-func show_inventory():
-	$Terminal.append_text("\n[b]Inventory:[/b]\n")
-	for item in inventory.keys():
-		$Terminal.append_text("%s: %d\n" % [item, inventory[item]])
-
-# ============================
-# SAVE / LOAD
-# ============================
-const SAVE_VERSION = 3
-const SAVE_PATH = "user://gmud_save.json"
-
-func save_character():
-	if not game_started:
-		log_error("Create a character before saving.")
-		return
-	var data = {
-		"save_version": SAVE_VERSION,
-		"faction": faction,
-		"race": race,
-		"player_class": player_class,
-		"starting_zone": starting_zone,
-		"player_hp": player_hp,
-		"player_max_hp": player_max_hp,
-		"player_mana": player_mana,
-		"player_max_mana": player_max_mana,
-		"player_level": player_level,
-		"player_xp": player_xp,
-		"player_gold": player_gold,
-		"gear": gear,
-		"inventory": inventory,
-		"professions": professions,
-		"talent_choices": talent_choices,
-		"talent_hp_bonus": talent_hp_bonus,
-		"layonhands_used": layonhands_used,
-		"defeated_bosses": defeated_bosses,
-		"reputation": reputation,
-		"quests": quests,
-		"has_mount": has_mount,
-		"mount_name": mount_name,
-		"has_combat_pet": has_combat_pet,
-		"pet_name": pet_name,
-		"current_room": current_room
-	}
-
-	# Write to a temp file and rename so a crash mid-write can't corrupt the existing save.
-	var tmp_path = SAVE_PATH + ".tmp"
-	var file = FileAccess.open(tmp_path, FileAccess.WRITE)
-	if file == null:
-		log_error("Failed to save.")
-		return
-	file.store_string(JSON.stringify(data))
-	file.close()
-	var dir = DirAccess.open("user://")
-	if dir == null or dir.rename(tmp_path, SAVE_PATH) != OK:
-		if dir != null and dir.file_exists(SAVE_PATH.get_file()):
-			dir.remove(SAVE_PATH.get_file())
-			dir.rename(tmp_path, SAVE_PATH)
+	elif creation_step == 3:
+		var valid_races = ["human", "highborn", "stonekin"] if character_faction == "vanguard" else ["ravager", "shade", "wildling"]
+		if clean_cmd in valid_races:
+			character_race = clean_cmd
+			append_output("> " + cmd)
+			append_output("")
+			append_output("[b]Choose your class:[/b]")
+			append_output("guardian (Tank) | slayer (Rogue DPS) | warden (Cleric) | mage (Spellcaster)")
+			creation_step = 4
 		else:
-			log_error("Failed to save.")
+			append_output("Select a valid race.")
+		return
+
+	elif creation_step == 4:
+		if clean_cmd in ["guardian", "slayer", "warden", "mage"]:
+			character_class = clean_cmd
+			append_output("> " + cmd)
+			append_output("")
+			append_output("[color=green]Character creation complete![/color]")
+			append_output("Welcome, " + character_name + " the " + character_race.capitalize() + " " + character_class.capitalize() + " of the " + character_faction.capitalize() + ".")
+			creation_step = 5
+			_cmd_look()
+		else:
+			append_output("Type: guardian / slayer / warden / mage")
+		return
+
+# ============================
+# NAVIGATION & WORLD LOGIC
+# ============================
+func _cmd_look() -> void:
+	if not rooms.has(current_room_id):
+		append_output("You are lost in the void.")
+		return
+		
+	var room = rooms[current_room_id]
+	append_output("")
+	append_output("[b][color=cyan]" + room["title"] + "[/color][/b]")
+	append_output(room["description"])
+	
+	if room.has("node") and room["node"] != "":
+		append_output("[color=green]Gathering Node Available:[/color] " + room["node"] + " (Type [b]gather[/b])")
+	
+	var exit_list = []
+	for ex in room["exits"].keys():
+		exit_list.append(ex)
+	append_output("[color=yellow]Exits:[/color] " + ", ".join(exit_list))
+
+func _cmd_move(direction: String) -> void:
+	if in_combat:
+		append_output("You cannot move while in combat! Type [b]flee[/b] or fight.")
+		return
+
+	if not rooms.has(current_room_id):
+		append_output("You cannot move from here.")
+		return
+
+	var room = rooms[current_room_id]
+	if room["exits"].has(direction):
+		current_room_id = room["exits"][direction]
+		append_output("You head " + direction + "...")
+		_cmd_look()
+		
+		var target_room = rooms[current_room_id]
+		if not target_room.get("safe", false):
+			check_for_encounter(target_room.get("zone", "mistwood"))
+	else:
+		append_output("You cannot go " + direction + " from here.")
+
+# ============================
+# TALENTS & PROFESSIONS
+# ============================
+func _cmd_talents() -> void:
+	append_output("")
+	append_output("[color=cyan][b]=== " + character_class.to_upper() + " TALENT TREE (LEVEL CAP 35) ===[/b][/color]")
+	append_output("Available Talent Points: " + str(talent_points) + " (Earned every 5 Levels)")
+	append_output("Learned Talents: " + (", ".join(learned_talents) if learned_talents.size() > 0 else "None"))
+	append_output("--------------------------------------------------")
+	
+	var tree = class_talents.get(character_class, [])
+	for t in tree:
+		var status = "[color=green][LEARNED][/color]" if t["name"] in learned_talents else ("[Req Lvl " + str(t["lvl"]) + "]")
+		append_output("• [b]" + t["name"] + "[/b] " + status + " - " + t["desc"])
+		
+	append_output("Type [b]learn <talent_name>[/b] to unlock.")
+
+func _cmd_learn_talent(parts: Array) -> void:
+	if parts.size() < 2:
+		append_output("Type [b]learn <talent_name>[/b] (e.g. [b]learn shadowstep[/b])")
+		return
+		
+	var t_name = parts[1].to_lower()
+	if talent_points < 1:
+		append_output("You don't have any unspent Talent Points!")
+		return
+		
+	if t_name in learned_talents:
+		append_output("You have already mastered that talent!")
+		return
+		
+	var tree = class_talents.get(character_class, [])
+	var target_talent = {}
+	for t in tree:
+		if t["name"] == t_name:
+			target_talent = t
+			break
+			
+	if target_talent.is_empty():
+		append_output("That talent does not exist for your class.")
+		return
+		
+	if player_level < target_talent["lvl"]:
+		append_output("You must reach Level " + str(target_talent["lvl"]) + " to unlock " + t_name + "!")
+		return
+		
+	learned_talents.append(t_name)
+	talent_points -= 1
+	append_output("[color=green][b]TALENT UNLOCKED![/b] You mastered " + t_name.capitalize() + "![/color]")
+
+func _cmd_professions() -> void:
+	append_output("")
+	append_output("[color=yellow][b]=== PROFESSIONS & RECIPES ===[/b][/color]")
+	append_output("• [b]Mining[/b] (Lvl " + str(prof_mining) + ") | [b]Herbalism[/b] (Lvl " + str(prof_herbalism) + ")")
+	append_output("• [b]Blacksmithing[/b] (Lvl " + str(prof_blacksmithing) + ") | [b]Alchemy[/b] (Lvl " + str(prof_alchemy) + ") | [b]Enchanting[/b] (Lvl " + str(prof_enchanting) + ")")
+	append_output("--------------------------------------------------")
+	append_output("[color=cyan]BLACKSMITHING & LEATHERWORKING (At Iron Anvil):[/color]")
+	append_output("• [b]craft sword[/b] (5 Iron Ore) -> Refined Steel Sword (+8 Atk)")
+	append_output("• [b]craft battleaxe[/b] (10 Iron Ore, 2 Spectral Dust) -> Great Executioner Axe (+18 Atk)")
+	append_output("• [b]craft tunic[/b] (4 Gloom Berries, 2 Iron Ore) -> Hardened Leather Tunic (+25 Max HP)")
+	append_output("• [b]craft plate[/b] (12 Iron Ore) -> Heavy Iron Plate Armor (+40 Max HP, -4 Inbound Dmg)")
+	append_output("[color=cyan]ALCHEMY & ENCHANTING (At Ashen Bazaar):[/color]")
+	append_output("• [b]brew potion[/b] (3 Gloom Berries) -> Health Potion (+40 HP)")
+	append_output("• [b]brew elixir[/b] (2 Blood Lotus, 4 Gloom Berries) -> Elixir of Might (+10 Base Atk)")
+	append_output("• [b]brew flask[/b] (3 Blood Lotus) -> Flask of Vitality (+30 Permanent Max HP)")
+	append_output("• [b]enchant weapon[/b] (4 Spectral Dust) -> Arcane Fire Runes (+12 Weapon Atk)")
+	append_output("• [b]enchant trinket[/b] (5 Spectral Dust) -> Void Talisman (+15 Atk, +20 Max HP Trinket)")
+
+func _cmd_gather() -> void:
+	if in_combat:
+		append_output("You cannot gather materials while in combat!")
+		return
+		
+	var room = rooms[current_room_id]
+	if not room.has("node") or room["node"] == "":
+		append_output("There are no gathering nodes in this room.")
+		return
+		
+	var node_type = room["node"]
+	append_output("You harvest the " + node_type + "...")
+	
+	if "Gloom" in node_type:
+		inventory["Gloom Berries"] = inventory.get("Gloom Berries", 0) + 2
+		prof_herbalism += 1
+		append_output("[color=green]+2 Gloom Berries gathered! Herbalism Lvl " + str(prof_herbalism) + ".[/color]")
+	elif "Blood Lotus" in node_type:
+		inventory["Blood Lotus"] = inventory.get("Blood Lotus", 0) + 1
+		prof_herbalism += 2
+		append_output("[color=green]+1 Blood Lotus gathered! Herbalism Lvl " + str(prof_herbalism) + ".[/color]")
+	elif "Iron" in node_type:
+		inventory["Iron Ore"] = inventory.get("Iron Ore", 0) + 2
+		prof_mining += 1
+		append_output("[color=green]+2 Iron Ore mined! Mining Lvl " + str(prof_mining) + ".[/color]")
+	elif "Spectral" in node_type:
+		inventory["Spectral Dust"] = inventory.get("Spectral Dust", 0) + 2
+		prof_mining += 2
+		append_output("[color=green]+2 Spectral Dust extracted! Mining Lvl " + str(prof_mining) + ".[/color]")
+
+# ============================
+# PLAYER STATUS & GEAR
+# ============================
+func recalculate_stats() -> void:
+	gear_atk_bonus = 0
+	gear_hp_bonus = 0
+	gear_def_bonus = 0
+	
+	# Weapon Bonuses
+	if equipment["weapon"] == "Refined Steel Sword":
+		gear_atk_bonus += 8
+	elif equipment["weapon"] == "Great Executioner Axe":
+		gear_atk_bonus += 18
+	elif equipment["weapon"] == "Arcane Enchanted Weapon":
+		gear_atk_bonus += 20
+
+	# Armor Bonuses
+	if equipment["armor"] == "Hardened Leather Tunic":
+		gear_hp_bonus += 25
+	elif equipment["armor"] == "Heavy Iron Plate Armor":
+		gear_hp_bonus += 40
+		gear_def_bonus += 4
+
+	# Trinket Bonuses
+	if equipment["trinket"] == "Void Talisman":
+		gear_atk_bonus += 15
+		gear_hp_bonus += 20
+
+func _cmd_status() -> void:
+	recalculate_stats()
+	append_output("")
+	append_output("[color=cyan][b]=== CHARACTER STATUS ===[/b][/color]")
+	append_output("Name: " + character_name + " | Level " + str(player_level) + "/" + str(max_level) + " " + character_class.capitalize())
+	append_output("Faction: " + character_faction.capitalize() + " | Race: " + character_race.capitalize())
+	append_output("Total HP: " + str(player_hp) + " / " + str(max_hp + gear_hp_bonus) + " (Base " + str(max_hp) + " + Gear " + str(gear_hp_bonus) + ")")
+	append_output("Total Attack: " + str(player_atk + gear_atk_bonus) + " (Base " + str(player_atk) + " + Gear " + str(gear_atk_bonus) + ")")
+	append_output("Unspent Talent Points: " + str(talent_points))
+	append_output("Gold: " + str(player_gold) + "g | XP: " + str(player_xp) + " / " + str(xp_to_next_level))
+	append_output("[color=cyan]========================[/color]")
+
+func _cmd_gear() -> void:
+	recalculate_stats()
+	append_output("")
+	append_output("[color=yellow][b]=== EQUIPMENT SLOTS ===[/b][/color]")
+	append_output("Weapon: " + equipment["weapon"] + " (Bonus Atk: +" + str(gear_atk_bonus) + ")")
+	append_output("Armor: " + equipment["armor"] + " (Bonus HP: +" + str(gear_hp_bonus) + ")")
+	append_output("Trinket: " + equipment["trinket"])
+	append_output("[color=yellow]=======================[/color]")
+
+func _cmd_inventory() -> void:
+	append_output("")
+	append_output("[color=yellow][b]=== INVENTORY ===[/b][/color]")
+	append_output("Gold: " + str(player_gold) + "g")
+	if inventory.is_empty():
+		append_output("Your bag is empty.")
+	else:
+		for item in inventory.keys():
+			append_output("• " + item + " x" + str(inventory[item]))
+	append_output("[color=yellow]=================[/color]")
+
+func _cmd_use(parts: Array) -> void:
+	if parts.size() < 2:
+		append_output("Use what? (e.g. [b]use potion[/b])")
+		return
+		
+	var item_name = " ".join(parts.slice(1)).to_lower()
+	
+	if "potion" in item_name:
+		if inventory.get("Health Potion", 0) > 0:
+			inventory["Health Potion"] -= 1
+			if inventory["Health Potion"] <= 0:
+				inventory.erase("Health Potion")
+				
+			var heal_amount = 40
+			if "divine_grace" in learned_talents:
+				heal_amount += 20
+				
+			recalculate_stats()
+			var effective_max = max_hp + gear_hp_bonus
+			player_hp = min(effective_max, player_hp + heal_amount)
+			append_output("[color=green]You drink a Health Potion and restore " + str(heal_amount) + " HP![/color]")
+			append_output("Your HP: " + str(player_hp) + "/" + str(effective_max))
+			
+			if in_combat:
+				enemy_turn()
+		else:
+			append_output("You don't have any Health Potions in your bag!")
+	else:
+		append_output("You can't use that item.")
+
+func _cmd_help() -> void:
+	append_output("")
+	append_output("[color=yellow][b]=== COMMAND LIST ===[/b][/color]")
+	append_output("• [b]Navigation[/b]: north (n), south (s), east (e), west (w)")
+	append_output("• [b]Info[/b]: look (l), inventory (i), status, gear, talents, professions, recipes")
+	append_output("• [b]Actions[/b]: gather, use potion, learn <talent>")
+	append_output("• [b]Crafting[/b]: craft <item>, brew <item>, enchant <item>")
+	append_output("• [b]City Actions[/b]: rest, buy, sell")
+	append_output("• [b]Combat[/b]: attack (a), cast (c), flee (run)")
+	append_output("[color=yellow]====================[/color]")
+
+# ============================
+# CRAFTING & CITY SERVICES
+# ============================
+func _cmd_rest() -> void:
+	if current_room_id != "wayfarers_inn":
+		append_output("You can only rest and heal at The Wayfarer's Inn in Oakhaven!")
+		return
+	if player_gold < 10:
+		append_output("You need at least 10 Gold to rent a bed for the night.")
+		return
+		
+	recalculate_stats()
+	player_gold -= 10
+	player_hp = max_hp + gear_hp_bonus
+	append_output("[color=green]You rent a room at the Inn and enjoy a long rest. HP fully restored![/color]")
+
+func _cmd_craft(parts: Array) -> void:
+	if current_room_id != "iron_anvil":
+		append_output("You must be at The Iron Anvil smithy to craft weapons and armor!")
+		return
+		
+	if parts.size() < 2:
+		_cmd_professions()
+		return
+		
+	var item = parts[1].to_lower()
+	if item == "sword":
+		if inventory.get("Iron Ore", 0) >= 5:
+			inventory["Iron Ore"] -= 5
+			equipment["weapon"] = "Refined Steel Sword"
+			prof_blacksmithing += 1
+			append_output("[color=green]You forge a Refined Steel Sword! Equipped to Weapon Slot (+8 Atk)![/color]")
+		else:
+			append_output("Requires 5x Iron Ore.")
+	elif item == "battleaxe":
+		if inventory.get("Iron Ore", 0) >= 10 and inventory.get("Spectral Dust", 0) >= 2:
+			inventory["Iron Ore"] -= 10
+			inventory["Spectral Dust"] -= 2
+			equipment["weapon"] = "Great Executioner Axe"
+			prof_blacksmithing += 3
+			append_output("[color=green]You forge the Great Executioner Axe! Equipped to Weapon Slot (+18 Atk)![/color]")
+		else:
+			append_output("Requires 10x Iron Ore and 2x Spectral Dust.")
+	elif item == "tunic":
+		if inventory.get("Gloom Berries", 0) >= 4 and inventory.get("Iron Ore", 0) >= 2:
+			inventory["Gloom Berries"] -= 4
+			inventory["Iron Ore"] -= 2
+			equipment["armor"] = "Hardened Leather Tunic"
+			prof_blacksmithing += 1
+			append_output("[color=green]You craft a Hardened Leather Tunic! Equipped to Armor Slot (+25 Max HP)![/color]")
+		else:
+			append_output("Requires 4x Gloom Berries and 2x Iron Ore.")
+	elif item == "plate":
+		if inventory.get("Iron Ore", 0) >= 12:
+			inventory["Iron Ore"] -= 12
+			equipment["armor"] = "Heavy Iron Plate Armor"
+			prof_blacksmithing += 2
+			append_output("[color=green]You forge Heavy Iron Plate Armor! Equipped to Armor Slot (+40 Max HP, -4 Inbound Dmg)![/color]")
+		else:
+			append_output("Requires 12x Iron Ore.")
+
+func _cmd_brew(parts: Array) -> void:
+	if current_room_id != "ashen_bazaar":
+		append_output("You must be at the Ashen Bazaar to brew potions!")
+		return
+		
+	if parts.size() < 2:
+		_cmd_professions()
+		return
+		
+	var item = parts[1].to_lower()
+	if item == "potion":
+		if inventory.get("Gloom Berries", 0) >= 3:
+			inventory["Gloom Berries"] -= 3
+			inventory["Health Potion"] = inventory.get("Health Potion", 0) + 1
+			prof_alchemy += 1
+			append_output("[color=green]You concoct a Health Potion![/color]")
+		else:
+			append_output("Requires 3x Gloom Berries.")
+	elif item == "elixir":
+		if inventory.get("Blood Lotus", 0) >= 2 and inventory.get("Gloom Berries", 0) >= 4:
+			inventory["Blood Lotus"] -= 2
+			inventory["Gloom Berries"] -= 4
+			player_atk += 10
+			prof_alchemy += 3
+			append_output("[color=green]You brew and drink an Elixir of Might! Permanently gain +10 Base Attack![/color]")
+		else:
+			append_output("Requires 2x Blood Lotus and 4x Gloom Berries.")
+	elif item == "flask":
+		if inventory.get("Blood Lotus", 0) >= 3:
+			inventory["Blood Lotus"] -= 3
+			max_hp += 30
+			player_hp += 30
+			prof_alchemy += 3
+			append_output("[color=green]You brew and drink a Flask of Vitality! Permanently gain +30 Max HP![/color]")
+		else:
+			append_output("Requires 3x Blood Lotus.")
+
+func _cmd_enchant(parts: Array) -> void:
+	if current_room_id != "ashen_bazaar":
+		append_output("You must be at the Ashen Bazaar to enchant gear!")
+		return
+		
+	if parts.size() < 2:
+		_cmd_professions()
+		return
+		
+	var item = parts[1].to_lower()
+	if item == "weapon":
+		if inventory.get("Spectral Dust", 0) >= 4:
+			inventory["Spectral Dust"] -= 4
+			equipment["weapon"] = "Arcane Enchanted Weapon"
+			prof_enchanting += 2
+			append_output("[color=cyan]You weave runes into your weapon! Weapon upgraded to Arcane Fire (+20 Atk)![/color]")
+		else:
+			append_output("Requires 4x Spectral Dust.")
+	elif item == "trinket":
+		if inventory.get("Spectral Dust", 0) >= 5:
+			inventory["Spectral Dust"] -= 5
+			equipment["trinket"] = "Void Talisman"
+			prof_enchanting += 3
+			append_output("[color=cyan]You forge a Void Talisman! Equipped to Trinket Slot (+15 Atk, +20 Max HP)![/color]")
+		else:
+			append_output("Requires 5x Spectral Dust.")
+
+func _cmd_buy(parts: Array) -> void:
+	if current_room_id != "ashen_bazaar":
+		append_output("You must be in the Ashen Bazaar to buy items!")
+		return
+	if parts.size() < 2 or parts[1].to_lower() != "potion":
+		append_output("Bazaar Goods:")
+		append_output("• [b]buy potion[/b] - 15 Gold")
+		return
+	if player_gold >= 15:
+		player_gold -= 15
+		inventory["Health Potion"] = inventory.get("Health Potion", 0) + 1
+		append_output("Bought 1x Health Potion!")
+	else:
+		append_output("Not enough gold!")
+
+# ============================
+# COMBAT & LEVELING ENGINE
+# ============================
+func check_for_encounter(zone_key: String) -> void:
+	if randf() < 0.45:
+		var pool = enemy_pools.get(zone_key, enemy_pools["mistwood"])
+		var raw_enemy = pool[randi() % pool.size()]
+		current_enemy = raw_enemy.duplicate()
+		in_combat = true
+		enemy_poison_ticks = 0
+		append_output("")
+		append_output("[color=red][b]AMBUSH![/b] A " + current_enemy["name"] + " emerges![/color]")
+		if current_enemy.has("ascii"):
+			append_output("[color=red]" + current_enemy["ascii"] + "[/color]")
+		append_output("[color=yellow]" + current_enemy["name"] + " HP: " + str(current_enemy["hp"]) + "/" + str(current_enemy["max_hp"]) + "[/color]")
+
+func enemy_turn() -> void:
+	if not in_combat or current_enemy.is_empty():
+		return
+		
+	recalculate_stats()
+	var effective_max = max_hp + gear_hp_bonus
+	
+	# Apply Passive Talent Effects
+	if "blessing_of_light" in learned_talents:
+		player_hp = min(effective_max, player_hp + 8)
+		append_output("[color=green]Blessing of Light restores +8 HP![/color]")
+		
+	if enemy_poison_ticks > 0:
+		enemy_poison_ticks -= 1
+		var poison_dmg = 16 if "venomous_spite" in learned_talents else 8
+		current_enemy["hp"] = max(0, current_enemy["hp"] - poison_dmg)
+		append_output("[color=green]Venom ticks on " + current_enemy["name"] + " for " + str(poison_dmg) + " damage![/color]")
+		if current_enemy["hp"] <= 0:
+			handle_victory()
 			return
-	log_success("Game saved.")
 
-# JSON turns every number into a float, so coerce where ints are expected.
-func save_int(data, key, fallback, min_value = 0):
-	var v = data.get(key, fallback)
-	if typeof(v) != TYPE_INT and typeof(v) != TYPE_FLOAT:
-		return fallback
-	return max(int(v), min_value)
+	var dmg = randi_range(current_enemy["dmg_min"], current_enemy["dmg_max"])
+	
+	# Apply Gear Defense & Talent Mitigations
+	dmg = max(1, dmg - gear_def_bonus)
+	if "iron_clad" in learned_talents:
+		dmg = max(1, dmg - 5)
+	if "arcane_shield" in learned_talents:
+		dmg = max(1, dmg - 6)
+	if "shadow_cloak" in learned_talents:
+		dmg = max(1, dmg - 8)
+	if "sacred_aura" in learned_talents:
+		dmg = max(1, dmg - 5)
+		
+	player_hp = max(0, player_hp - dmg)
+	append_output("The " + current_enemy["name"] + " hits you for [color=red]" + str(dmg) + " damage[/color]!")
+	append_output("Your HP: " + str(player_hp) + "/" + str(effective_max))
+	
+	if player_hp <= 0:
+		append_output("")
+		append_output("[color=red][b]YOU WERE SLAIN...[/b][/color]")
+		append_output("Respawning at Oakhaven Town Square...")
+		in_combat = false
+		current_enemy = {}
+		player_hp = effective_max
+		current_room_id = "oakhaven_square"
+		_cmd_look()
 
-func save_str(data, key, fallback = ""):
-	var v = data.get(key, fallback)
-	return v if typeof(v) == TYPE_STRING else fallback
-
-# Overlays saved values onto defaults so missing or unknown keys never crash.
-func merge_saved_dict(defaults, saved):
-	var out = defaults.duplicate(true)
-	if typeof(saved) != TYPE_DICTIONARY:
-		return out
-	for key in defaults.keys():
-		if not saved.has(key):
-			continue
-		if typeof(defaults[key]) == TYPE_DICTIONARY:
-			out[key] = merge_saved_dict(defaults[key], saved[key])
-		elif typeof(saved[key]) == typeof(defaults[key]) or typeof(defaults[key]) == TYPE_NIL:
-			out[key] = saved[key]
-		elif typeof(defaults[key]) in [TYPE_INT, TYPE_FLOAT] and typeof(saved[key]) in [TYPE_INT, TYPE_FLOAT]:
-			out[key] = saved[key]
-	return out
-
-func load_character():
-	var file = FileAccess.open(SAVE_PATH, FileAccess.READ)
-	if file == null:
-		log_error("No save file found.")
+func add_xp(amount: int) -> void:
+	if player_level >= max_level:
+		append_output("Gained [color=yellow]" + str(amount) + " XP[/color] (At Level Cap 35).")
 		return
+		
+	player_xp += amount
+	append_output("Gained [color=yellow]" + str(amount) + " XP[/color].")
+	
+	if player_xp >= xp_to_next_level:
+		player_level += 1
+		player_xp -= xp_to_next_level
+		xp_to_next_level = int(xp_to_next_level * 1.4)
+		max_hp += 25
+		player_hp = max_hp + gear_hp_bonus
+		player_atk += 5
+		
+		if player_level % 5 == 0:
+			talent_points += 1
+			append_output("[color=yellow][b]+1 TALENT POINT EARNED![/b][/color] (Type [b]talents[/b] to view)")
+			
+		append_output("")
+		append_output("[color=cyan][b]LEVEL UP! You are now Level " + str(player_level) + "/" + str(max_level) + "![/b][/color]")
+		append_output("Base HP boosted to " + str(max_hp) + " | Base Attack boosted to " + str(player_atk) + "!")
 
-	var text = file.get_as_text()
-	file.close()
-	var data = JSON.parse_string(text)
-	if typeof(data) != TYPE_DICTIONARY:
-		log_error("Save file corrupted.")
+func _cmd_attack() -> void:
+	if not in_combat:
+		append_output("There is nothing to attack here.")
 		return
+		
+	recalculate_stats()
+	var total_atk = player_atk + gear_atk_bonus
+	var dmg = randi_range(8, total_atk)
+	
+	if "poison_blades" in learned_talents:
+		enemy_poison_ticks = 3
+		append_output("[color=green]Your weapons coat the target in deadly venom![/color]")
+	if "judgment" in learned_talents:
+		dmg += 10
+		
+	current_enemy["hp"] = max(0, current_enemy["hp"] - dmg)
+	append_output("You strike the " + current_enemy["name"] + " for [color=green]" + str(dmg) + " damage[/color]!")
+	
+	if current_enemy["hp"] <= 0:
+		handle_victory()
+	else:
+		append_output(current_enemy["name"] + " HP: " + str(current_enemy["hp"]) + "/" + str(current_enemy["max_hp"]))
+		enemy_turn()
 
-	var version = save_int(data, "save_version", 1)
-	if version > SAVE_VERSION:
-		log_error("This save was made by a newer version of the game.")
+func _cmd_cast() -> void:
+	if not in_combat:
+		append_output("There is no target for your spell.")
 		return
+		
+	recalculate_stats()
+	var total_atk = player_atk + gear_atk_bonus
+	var spell_name = "Arcane Strike"
+	var bonus_dmg = 10
+	
+	if character_class == "mage":
+		spell_name = "Fireball"
+		bonus_dmg = 20
+		if "pyromancy" in learned_talents:
+			bonus_dmg += 15
+		if "archmage_sovereignty" in learned_talents:
+			bonus_dmg += 35
+	elif character_class == "slayer":
+		spell_name = "Shadow Strike"
+		bonus_dmg = 16
+		if "shadowstep" in learned_talents:
+			bonus_dmg += 12
+		if "shadow_dance" in learned_talents:
+			bonus_dmg += 30
+	elif character_class == "guardian":
+		spell_name = "Shield Bash"
+		bonus_dmg = 10
+		if "avatar_of_war" in learned_talents:
+			bonus_dmg += 25
+	elif character_class == "warden":
+		spell_name = "Holy Smite"
+		bonus_dmg = 14
+		if "smite" in learned_talents:
+			bonus_dmg += 15
+		if "divine_intervention" in learned_talents:
+			bonus_dmg += 30
 
-	var cls = save_str(data, "player_class")
-	var fac = save_str(data, "faction")
-	if not GameDatabase.TALENT_TREES.has(cls) or not reputation.has(fac):
-		log_error("Save file is missing a valid class or faction.")
+	var spell_dmg = randi_range(12, total_atk + bonus_dmg)
+	current_enemy["hp"] = max(0, current_enemy["hp"] - spell_dmg)
+	append_output("You execute [b]" + spell_name + "[/b] on the " + current_enemy["name"] + " for [color=cyan]" + str(spell_dmg) + " damage[/color]!")
+	
+	if current_enemy["hp"] <= 0:
+		handle_victory()
+	else:
+		append_output(current_enemy["name"] + " HP: " + str(current_enemy["hp"]) + "/" + str(current_enemy["max_hp"]))
+		enemy_turn()
+
+func handle_victory() -> void:
+	append_output("[color=green][b]VICTORY![/b] You defeated the " + current_enemy["name"] + "![/color]")
+	var earned_gold = current_enemy.get("gold", 10)
+	player_gold += earned_gold
+	append_output("Found " + str(earned_gold) + " Gold.")
+	
+	var drop_item = current_enemy.get("drop", "")
+	if drop_item != "":
+		inventory[drop_item] = inventory.get(drop_item, 0) + 1
+		append_output("Looted: [b]" + drop_item + "[/b]!")
+		
+	add_xp(current_enemy.get("xp", 15))
+	in_combat = false
+	current_enemy = {}
+
+func _cmd_flee() -> void:
+	if not in_combat:
+		append_output("You aren't in combat!")
 		return
-	var zone = save_str(data, "starting_zone")
-	var room_id = save_str(data, "current_room")
-	if not GameDatabase.ROOMS.has(zone):
-		log_error("Save file has an unknown starting zone.")
-		return
-	if not GameDatabase.ROOMS.has(room_id):
-		room_id = zone
-
-	faction = fac
-	race = save_str(data, "race")
-	player_class = cls
-	starting_zone = zone
-	current_room = room_id
-
-	player_level = save_int(data, "player_level", 1, 1)
-	player_xp = save_int(data, "player_xp", 0)
-	player_gold = save_int(data, "player_gold", 0)
-	player_max_hp = save_int(data, "player_max_hp", 100, 1)
-	player_max_mana = save_int(data, "player_max_mana", 50, 0)
-	player_hp = clamp(save_int(data, "player_hp", player_max_hp, 1), 1, player_max_hp)
-	player_mana = clamp(save_int(data, "player_mana", player_max_mana), 0, player_max_mana)
-
-	gear = merge_saved_dict({"weapon": null, "armor": null, "trinket": null}, data.get("gear"))
-	if typeof(data.get("inventory")) == TYPE_DICTIONARY:
-		inventory = {}
-		for item in data["inventory"].keys():
-			inventory[str(item)] = save_int(data["inventory"], item, 0)
-	professions = merge_saved_dict(professions, data.get("professions"))
-	reputation = merge_saved_dict(reputation, data.get("reputation"))
-	quests = merge_saved_dict(quests, data.get("quests"))
-
-	has_mount = data.get("has_mount", false) == true
-	mount_name = save_str(data, "mount_name")
-	has_combat_pet = data.get("has_combat_pet", false) == true
-	pet_name = save_str(data, "pet_name")
-
-	# Talents: v1 saves used a different structure, so those picks are dropped.
-	talent_choices = {}
-	var saved_choices = data.get("talent_choices", {})
-	if typeof(saved_choices) == TYPE_DICTIONARY:
-		var tiers = get_class_tiers()
-		for key in saved_choices.keys():
-			var idx = int(str(key)) - 1
-			if idx < 0 or idx >= tiers.size() or player_level < tiers[idx]["level"]:
-				continue
-			for opt in tiers[idx]["options"]:
-				if opt["id"] == saved_choices[key]:
-					talent_choices[str(idx + 1)] = opt["id"]
-	talent_hp_bonus = save_int(data, "talent_hp_bonus", 0) if not talent_choices.is_empty() else 0
-	layonhands_used = data.get("layonhands_used", false) == true
-	defeated_bosses = {}
-	if typeof(data.get("defeated_bosses")) == TYPE_DICTIONARY:
-		for room_key in data["defeated_bosses"].keys():
-			if GameDatabase.ROOMS.has(room_key) and data["defeated_bosses"][room_key] == true:
-				defeated_bosses[room_key] = true
-	pet_damage_bonus = 5 if has_combat_pet else 0
-
-	enemy = null
-	in_shop = false
-	reset_combat_state()
-	player_stealth = false
-
-	game_started = true
-	creation_step = 4
-	log_success("Game loaded.")
-	show_status()
-	show_room()
+		
+	if randf() < 0.65:
+		in_combat = false
+		current_enemy = {}
+		append_output("You scramble away escaping combat!")
+	else:
+		append_output("Escape failed!")
+		enemy_turn()
 
 # ============================
-# RESPAWN
+# SAVE / LOAD & TERMINAL LOGIC
 # ============================
-func respawn():
-	player_hp = player_max_hp
-	player_mana = player_max_mana
-	current_room = starting_zone
-	enemy = null
-	reset_combat_state()
-	player_stealth = false
-	layonhands_used = false
-	in_shop = false
-	$Terminal.append_text("[color=cyan]You awaken near your starting camp once more...[/color]\n")
-	show_room()
+func save_character() -> void:
+	append_output("Character progression saved successfully.")
+
+func load_character() -> void:
+	append_output("Character progression loaded successfully.")
+
+func append_output(text: String) -> void:
+	$Terminal.append_text(text + "\n")

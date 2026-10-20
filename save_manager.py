@@ -110,7 +110,13 @@ if __name__ == "__main__":
             self.inventory = {}
             self.zone = zone
 
-    player = Player("Hero", 12, "Mistwood Forest")
+    from command_parser import prompt_custom_character_name
+
+    # Prompt character name
+    character_name = prompt_custom_character_name()
+
+    # Initialize player and save manager
+    player = Player(character_name, 12, "Mistwood Forest")
     manager = SaveManager()
 
     # Save the game
@@ -120,5 +126,5 @@ if __name__ == "__main__":
     manager.list_saves()
 
     # Load a save
-    save_data = manager.load_game("Hero")
+    save_data = manager.load_game(character_name)
     print("\nLoaded Save Data:", save_data)

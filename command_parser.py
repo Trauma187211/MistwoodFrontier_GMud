@@ -25,25 +25,41 @@ def validate_character_name(name: str) -> tuple[bool, str]:
     return True, cleaned_name
 
 
+def prompt_custom_character_name() -> str:
+    """
+    Interactive prompt loop for creating a character with name validation.
+    Use this during New Game initialization.
+    """
+    print("\n--- CHARACTER CREATION ---")
+    while True:
+        raw_name = input("Enter your character name (1-18 chars, letters/numbers/_ only): ")
+        is_valid, result = validate_character_name(raw_name)
+        if is_valid:
+            print(f"Character created successfully! Welcome, {result}.\n")
+            return result
+        else:
+            print(f"Invalid input: {result}. Please try again.\n")
+
+
 class CommandParser:
     """
-    Maps user input to game commands with support for aliases.
+    Maps user input to game commands with support for aliases matching exact game loop expected keys.
     """
     COMMAND_ALIASES = {
-        # Movement
-        "move_forward": ["f", "fw", "forward", "n", "north"],
-        "move_backward": ["b", "back", "backward", "s", "south"],
-        "move_left": ["left", "w", "west"],
-        "move_right": ["r", "right", "e", "east"],
-        "teleport_home": ["home", "hearth", "recall"],
+        # Movement (Outputs exact expected game loop strings)
+        "move_forward": ["f", "fw", "forward", "n", "north", "move forward", "move_forward"],
+        "move_backward": ["b", "back", "backward", "s", "south", "move back", "move_backward"],
+        "move_left": ["left", "w", "west", "move left", "move_left"],
+        "move_right": ["r", "right", "e", "east", "move right", "move_right"],
+        "teleport_home": ["home", "hearth", "recall", "teleport_home"],
         
-        # Room & Gathering
-        "look_room": ["look", "l", "examine", "inspect"],
-        "gather_node": ["gather", "g", "harvest"],
+        # Room & Inspection
+        "look_room": ["look", "l", "examine", "inspect", "look_room"],
+        "gather_node": ["gather", "g", "harvest", "gather_node"],
         
         # Progression & Stats
-        "display_stats": ["stats", "status", "c", "char"],
-        "display_inventory": ["inv", "inventory", "i"],
+        "display_stats": ["stats", "status", "c", "char", "display_stats"],
+        "display_inventory": ["inv", "inventory", "i", "display_inventory"],
         "talents": ["talents", "talent", "trees", "t", "specs"],
         
         # Crafting & Professions
@@ -55,7 +71,7 @@ class CommandParser:
         "leatherworking": ["leatherworking", "lw", "tailoring"],
         
         # System Commands
-        "display_help": ["help", "h", "commands", "?"],
+        "display_help": ["help", "h", "commands", "?", "display_help"],
         "save": ["save"],
         "load": ["load"],
         "delete": ["delete"],
@@ -107,7 +123,7 @@ class CommandParser:
         Normalize user input to its mapped core command.
 
         :param input_command: Raw command from user input
-        :return: Normalized command string if a match is found, or error message otherwise
+        :return: Normalized command string matching exact game loop keys
         """
         if not input_command or not input_command.strip():
             return "Unknown Command: Type 'help' for options."
@@ -118,26 +134,21 @@ class CommandParser:
             if normalized_command in alias_list:
                 return base_command
                 
-        return f"Unknown Command: '{input_command}'. Type 'help' for options."
+        return normalized_command
 
 
 if __name__ == "__main__":
-    # Test Suite
-    test_commands = [
-        "f", "north", "b", "w", "l", "look", "g", "gather", 
-        "c", "inv", "home", "help", "craft", "alchemy", "invalid_cmd"
-    ]
+    # 1. Test Command Normalization
+    print("--- Testing Command Normalization ---")
+    test_inputs = ["forward", "f", "n", "back", "b", "look", "l", "stats", "inv", "help"]
+    for inp in test_inputs:
+        result = CommandParser.normalize_command(inp)
+        print(f"Input: '{inp}' --> Normalized Key: '{result}'")
 
-    print("--- Help Output ---")
+    # 2. Test Help Menu
     print(CommandParser.display_help())
 
-    print("\n--- Test Normalized Commands ---")
-    for cmd in test_commands:
-        normalized = CommandParser.normalize_command(cmd)
-        print(f"Input: '{cmd}' -> Normalized: {normalized}")
-
-    print("\n--- Test Character Name Validation ---")
-    test_names = ["Trauma", "Doc_Trauma", "Invalid Name", "TooLongOfANameThatExceeds18Chars", "Bad-Dash"]
-    for name in test_names:
-        valid, msg = validate_character_name(name)
-        print(f"Name: '{name}' -> Valid: {valid} | Output: {msg}")
+    # 3. Test Character Name Validation / Prompt
+    print("--- Testing Character Name Prompt ---")
+    player_name = prompt_custom_character_name()
+    print(f"Final Validated Character Name: {player_name}")
